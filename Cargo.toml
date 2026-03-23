@@ -6,7 +6,7 @@ license = "Apache-2.0"
 homepage = "https://itk.org/"
 description = "A Rust translation of ITK (Insight Segmentation and Registration Toolkit), the C++ medical image processing library."
 exclude = ["ITK/**", "ITK"]
-reposity = "https://github.com/henriksson-lab/itk-rs"
+repository = "https://github.com/henriksson-lab/itk-rs"
 
 [features]
 ## Enable PNG image I/O (requires the `png` crate).
