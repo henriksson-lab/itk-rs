@@ -3,6 +3,7 @@ pub mod pixel;
 pub mod source;
 pub mod region_splitter;
 pub mod filters;
+pub mod io;
 
 pub use image::{Image, Index, Size, Region};
 pub use pixel::{Pixel, NumericPixel, VecPixel};
