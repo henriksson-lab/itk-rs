@@ -32,7 +32,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Mean | `MeanImageFilter` | ✅ `src/filters/mean.rs` |
 | Median | `MedianImageFilter` | ✅ `src/filters/median.rs` |
 | Box Mean | `BoxMeanImageFilter` | ✅ `src/filters/mean.rs` |
-| Box Sigma | `BoxSigmaImageFilter` | ⬜ |
+| Box Sigma | `BoxSigmaImageFilter` | ✅ `src/filters/mean.rs` |
 | Binomial Blur | `BinomialBlurImageFilter` | ✅ `src/filters/binomial_blur.rs` |
 | FFT Discrete Gaussian | `FFTDiscreteGaussianImageFilter` | ⬜ |
 
@@ -42,7 +42,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 |---|---|---|
 | Gradient Anisotropic Diffusion | `GradientAnisotropicDiffusionImageFilter` | ✅ `src/filters/anisotropic_diffusion.rs` |
 | Curvature Anisotropic Diffusion | `CurvatureAnisotropicDiffusionImageFilter` | ✅ `src/filters/anisotropic_diffusion.rs` (D=2) |
-| Vector Gradient Anisotropic Diffusion | `VectorGradientAnisotropicDiffusionImageFilter` | ⬜ |
+| Vector Gradient Anisotropic Diffusion | `VectorGradientAnisotropicDiffusionImageFilter` | ✅ `src/filters/anisotropic_diffusion.rs` |
 | Vector Curvature Anisotropic Diffusion | `VectorCurvatureAnisotropicDiffusionImageFilter` | ⬜ |
 
 ### Denoising
@@ -68,7 +68,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Sin | `SinImageFilter` | ✅ `intensity::sin_filter` |
 | Cos | `CosImageFilter` | ✅ `intensity::cos_filter` |
 | Atan | `AtanImageFilter` | ✅ `intensity::atan_filter` |
-| Atan2 | `Atan2ImageFilter` | ⬜ |
+| Atan2 | `Atan2ImageFilter` | ✅ `intensity::atan2_images` |
 | Pow | `PowImageFilter` | ✅ `intensity::PowFilter` |
 | Sigmoid | `SigmoidImageFilter` | ✅ `intensity::SigmoidFilter` |
 | Invert Intensity | `InvertIntensityImageFilter` | ✅ `intensity::InvertIntensityFilter` |
@@ -76,34 +76,34 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Shift Scale | `ShiftScaleImageFilter` | ✅ `intensity::ShiftScaleFilter` |
 | Clamp | `ClampImageFilter` | ✅ `intensity::ClampFilter` |
 | Normalize | `NormalizeImageFilter` | ✅ `intensity::NormalizeFilter` |
-| Normalize to Constant | `NormalizeToConstantImageFilter` | ⬜ |
+| Normalize to Constant | `NormalizeToConstantImageFilter` | ✅ `intensity::NormalizeToConstantFilter` |
 | Intensity Windowing | `IntensityWindowingImageFilter` | ✅ `intensity::IntensityWindowingFilter` |
-| Histogram Matching | `HistogramMatchingImageFilter` | ⬜ |
+| Histogram Matching | `HistogramMatchingImageFilter` | ✅ `intensity::HistogramMatchingFilter` |
 | Mask | `MaskImageFilter` | ✅ `intensity::MaskFilter` |
 | Mask Negated | `MaskNegatedImageFilter` | ✅ `intensity::MaskNegatedFilter` |
 | Maximum (pixelwise) | `MaximumImageFilter` | ✅ `intensity::maximum_images` |
 | Minimum (pixelwise) | `MinimumImageFilter` | ✅ `intensity::minimum_images` |
-| And | `AndImageFilter` | ⬜ |
-| Or | `OrImageFilter` | ⬜ |
-| Xor | `XorImageFilter` | ⬜ |
-| Not | `NotImageFilter` | ⬜ |
+| And | `AndImageFilter` | ✅ `intensity::and_images` |
+| Or | `OrImageFilter` | ✅ `intensity::or_images` |
+| Xor | `XorImageFilter` | ✅ `intensity::xor_images` |
+| Not | `NotImageFilter` | ✅ `intensity::NotFilter` |
 | Weighted Add | `WeightedAddImageFilter` | ✅ `intensity::WeightedAddFilter` |
-| N-ary Add | `NaryAddImageFilter` | ⬜ |
-| N-ary Maximum | `NaryMaximumImageFilter` | ⬜ |
-| Constrained Value Addition | `ConstrainedValueAdditionImageFilter` | ⬜ |
-| Constrained Value Difference | `ConstrainedValueDifferenceImageFilter` | ⬜ |
+| N-ary Add | `NaryAddImageFilter` | ✅ `intensity::NaryAddFilter` |
+| N-ary Maximum | `NaryMaximumImageFilter` | ✅ `intensity::NaryMaximumFilter` |
+| Constrained Value Addition | `ConstrainedValueAdditionImageFilter` | ✅ `intensity::ConstrainedValueAdditionFilter` |
+| Constrained Value Difference | `ConstrainedValueDifferenceImageFilter` | ✅ `intensity::ConstrainedValueDifferenceFilter` |
 | Bounded Reciprocal | `BoundedReciprocalImageFilter` | ✅ `intensity::bounded_reciprocal_filter` |
 | Modulus | `ModulusImageFilter` | ✅ `intensity::ModulusFilter` |
 | Round | `RoundImageFilter` | ✅ `intensity::round_filter` |
 | Cast | `CastImageFilter` | ✅ (via `UnaryFilter` with `from_f64`/`to_f64`) |
-| Complex to Real | `ComplexToRealImageFilter` | ⬜ |
-| Complex to Imaginary | `ComplexToImaginaryImageFilter` | ⬜ |
-| Complex to Modulus | `ComplexToModulusImageFilter` | ⬜ |
-| Complex to Phase | `ComplexToPhaseImageFilter` | ⬜ |
+| Complex to Real | `ComplexToRealImageFilter` | ✅ `intensity::complex_to_real` |
+| Complex to Imaginary | `ComplexToImaginaryImageFilter` | ✅ `intensity::complex_to_imaginary` |
+| Complex to Modulus | `ComplexToModulusImageFilter` | ✅ `intensity::complex_to_modulus` |
+| Complex to Phase | `ComplexToPhaseImageFilter` | ✅ `intensity::complex_to_phase` |
 | Magnitude and Phase to Complex | `MagnitudeAndPhaseToComplexImageFilter` | ⬜ |
-| Vector Magnitude | `VectorMagnitudeImageFilter` | ⬜ |
-| Vector Index Selection Cast | `VectorIndexSelectionCastImageFilter` | ⬜ |
-| Compose Image | `ComposeImageFilter` | ⬜ |
+| Vector Magnitude | `VectorMagnitudeImageFilter` | ✅ `intensity::VectorMagnitudeFilter` |
+| Vector Index Selection Cast | `VectorIndexSelectionCastImageFilter` | ✅ `intensity::VectorIndexSelectionFilter` |
+| Compose Image | `ComposeImageFilter` | ✅ `intensity::Compose2Filter`, `Compose3Filter` |
 | Scalar to RGB Pixel | `ScalarToRGBPixelFunctor` | ⬜ |
 | Symmetric Eigen Analysis | `SymmetricEigenAnalysisImageFilter` | ⬜ |
 
@@ -114,105 +114,105 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Binary Threshold | `BinaryThresholdImageFilter` | ✅ `threshold::BinaryThresholdFilter` |
 | Threshold (in-place) | `ThresholdImageFilter` | ✅ `threshold::ThresholdFilter` |
 | Otsu Threshold | `OtsuThresholdImageFilter` | ✅ `threshold::OtsuThresholdFilter` |
-| Otsu Multiple Thresholds | `OtsuMultipleThresholdsImageFilter` | ⬜ |
-| Huang Threshold | `HuangThresholdImageFilter` | ⬜ |
-| Li Threshold | `LiThresholdImageFilter` | ⬜ |
-| IsoData Threshold | `IsoDataThresholdImageFilter` | ⬜ |
-| MaxEntropy Threshold | `MaximumEntropyThresholdImageFilter` | ⬜ |
-| Moments Threshold | `MomentsThresholdImageFilter` | ⬜ |
-| Triangle Threshold | `TriangleThresholdImageFilter` | ⬜ |
-| Yen Threshold | `YenThresholdImageFilter` | ⬜ |
-| Renyi Entropy Threshold | `RenyiEntropyThresholdImageFilter` | ⬜ |
-| Shanbhag Threshold | `ShanbhagThresholdImageFilter` | ⬜ |
-| Kittler-Illingworth Threshold | `KittlerIllingworthThresholdImageFilter` | ⬜ |
-| Intermodes Threshold | `IntermodesThresholdImageFilter` | ⬜ |
-| Kappa-Sigma Threshold | `KappaSigmaThresholdImageFilter` | ⬜ |
+| Otsu Multiple Thresholds | `OtsuMultipleThresholdsImageFilter` | ✅ `threshold::otsu_multiple_thresholds` |
+| Huang Threshold | `HuangThresholdImageFilter` | ✅ `threshold::huang_threshold_filter` |
+| Li Threshold | `LiThresholdImageFilter` | ✅ `threshold::li_threshold_filter` |
+| IsoData Threshold | `IsoDataThresholdImageFilter` | ✅ `threshold::iso_data_threshold_filter` |
+| MaxEntropy Threshold | `MaximumEntropyThresholdImageFilter` | ✅ `threshold::max_entropy_threshold_filter` |
+| Moments Threshold | `MomentsThresholdImageFilter` | ✅ `threshold::moments_threshold_filter` |
+| Triangle Threshold | `TriangleThresholdImageFilter` | ✅ `threshold::triangle_threshold_filter` |
+| Yen Threshold | `YenThresholdImageFilter` | ✅ `threshold::yen_threshold_filter` |
+| Renyi Entropy Threshold | `RenyiEntropyThresholdImageFilter` | ✅ `threshold::renyi_entropy_threshold_filter` |
+| Shanbhag Threshold | `ShanbhagThresholdImageFilter` | ✅ `threshold::shanbhag_threshold_filter` |
+| Kittler-Illingworth Threshold | `KittlerIllingworthThresholdImageFilter` | ✅ `threshold::kittler_illingworth_threshold_filter` |
+| Intermodes Threshold | `IntermodesThresholdImageFilter` | ✅ `threshold::intermodes_threshold_filter` |
+| Kappa-Sigma Threshold | `KappaSigmaThresholdImageFilter` | ✅ `threshold::kappa_sigma_threshold_filter` |
 
 ### Image Features & Edges
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Canny Edge Detection | `CannyEdgeDetectionImageFilter` | ⬜ |
-| Sobel Edge Detection | `SobelEdgeDetectionImageFilter` | ⬜ |
-| Laplacian | `LaplacianImageFilter` | ⬜ |
-| Laplacian Recursive Gaussian | `LaplacianRecursiveGaussianImageFilter` | ⬜ |
-| Laplacian Sharpening | `LaplacianSharpeningImageFilter` | ⬜ |
-| Zero Crossing | `ZeroCrossingImageFilter` | ⬜ |
-| Zero Crossing Based Edge Detection | `ZeroCrossingBasedEdgeDetectionImageFilter` | ⬜ |
-| Derivative | `DerivativeImageFilter` | ⬜ |
-| Discrete Gaussian Derivative | `DiscreteGaussianDerivativeImageFilter` | ⬜ |
-| Hessian Recursive Gaussian | `HessianRecursiveGaussianImageFilter` | ⬜ |
+| Canny Edge Detection | `CannyEdgeDetectionImageFilter` | ✅ `edges::CannyEdgeDetectionFilter` (D=2) |
+| Sobel Edge Detection | `SobelEdgeDetectionImageFilter` | ✅ `edges::SobelFilter` (D=2) |
+| Laplacian | `LaplacianImageFilter` | ✅ `edges::LaplacianFilter` |
+| Laplacian Recursive Gaussian | `LaplacianRecursiveGaussianImageFilter` | ✅ `edges::LaplacianRecursiveGaussianFilter` |
+| Laplacian Sharpening | `LaplacianSharpeningImageFilter` | ✅ `edges::LaplacianSharpeningFilter` |
+| Zero Crossing | `ZeroCrossingImageFilter` | ✅ `edges::ZeroCrossingFilter` |
+| Zero Crossing Based Edge Detection | `ZeroCrossingBasedEdgeDetectionImageFilter` | ✅ `edges::ZeroCrossingBasedEdgeDetectionFilter` |
+| Derivative | `DerivativeImageFilter` | ✅ `edges::DerivativeFilter` |
+| Discrete Gaussian Derivative | `DiscreteGaussianDerivativeImageFilter` | ✅ `edges::DiscreteGaussianDerivativeFilter` |
+| Hessian Recursive Gaussian | `HessianRecursiveGaussianImageFilter` | ✅ `edges::HessianRecursiveGaussianFilter` (D=2) |
 | Hessian to Objectness Measure | `HessianToObjectnessMeasureImageFilter` | ⬜ |
 | Multi-Scale Hessian Measure | `MultiScaleHessianBasedMeasureImageFilter` | ⬜ |
 | Hessian 3D to Vesselness | `Hessian3DToVesselnessMeasureImageFilter` | ⬜ |
 | Bilateral | `BilateralImageFilter` | ✅ `src/filters/bilateral.rs` |
-| Unsharp Mask | `UnsharpMaskImageFilter` | ⬜ |
+| Unsharp Mask | `UnsharpMaskImageFilter` | ✅ `edges::UnsharpMaskFilter` |
 | Gradient Vector Flow | `GradientVectorFlowImageFilter` | ⬜ |
-| Hough Transform 2D Circles | `HoughTransform2DCirclesImageFilter` | ⬜ |
-| Hough Transform 2D Lines | `HoughTransform2DLinesImageFilter` | ⬜ |
-| Simple Contour Extractor | `SimpleContourExtractorImageFilter` | ⬜ |
+| Hough Transform 2D Circles | `HoughTransform2DCirclesImageFilter` | ✅ `edges::HoughTransform2DCirclesFilter` |
+| Hough Transform 2D Lines | `HoughTransform2DLinesImageFilter` | ✅ `edges::HoughTransform2DLinesFilter` |
+| Simple Contour Extractor | `SimpleContourExtractorImageFilter` | ✅ `edges::SimpleContourExtractorFilter` |
 
 ### Gradients
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Gradient | `GradientImageFilter` | ⬜ |
-| Gradient Magnitude | `GradientMagnitudeImageFilter` | ⬜ |
-| Gradient Magnitude Recursive Gaussian | `GradientMagnitudeRecursiveGaussianImageFilter` | ⬜ |
-| Gradient Recursive Gaussian | `GradientRecursiveGaussianImageFilter` | ⬜ |
-| Difference of Gaussians Gradient | `DifferenceOfGaussiansGradientImageFilter` | ⬜ |
-| Vector Gradient Magnitude | `VectorGradientMagnitudeImageFilter` | ⬜ |
+| Gradient | `GradientImageFilter` | ✅ `edges::GradientFilter` |
+| Gradient Magnitude | `GradientMagnitudeImageFilter` | ✅ `edges::GradientMagnitudeFilter` |
+| Gradient Magnitude Recursive Gaussian | `GradientMagnitudeRecursiveGaussianImageFilter` | ✅ `edges::GradientMagnitudeRecursiveGaussianFilter` |
+| Gradient Recursive Gaussian | `GradientRecursiveGaussianImageFilter` | ✅ `edges::GradientRecursiveGaussianFilter` |
+| Difference of Gaussians Gradient | `DifferenceOfGaussiansGradientImageFilter` | ✅ `edges::DifferenceOfGaussiansFilter` |
+| Vector Gradient Magnitude | `VectorGradientMagnitudeImageFilter` | ✅ `edges::VectorGradientMagnitudeFilter` |
 
 ### Mathematical Morphology
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Grayscale Dilate | `GrayscaleDilateImageFilter` | ⬜ |
-| Grayscale Erode | `GrayscaleErodeImageFilter` | ⬜ |
-| Grayscale Morphological Opening | `GrayscaleMorphologicalOpeningImageFilter` | ⬜ |
-| Grayscale Morphological Closing | `GrayscaleMorphologicalClosingImageFilter` | ⬜ |
-| Morphological Gradient | `MorphologicalGradientImageFilter` | ⬜ |
-| White Top Hat | `WhiteTopHatImageFilter` | ⬜ |
-| Black Top Hat | `BlackTopHatImageFilter` | ⬜ |
-| Double Threshold | `DoubleThresholdImageFilter` | ⬜ |
-| H-Maxima | `HMaximaImageFilter` | ⬜ |
-| H-Minima | `HMinimaImageFilter` | ⬜ |
-| H-Concave | `HConcaveImageFilter` | ⬜ |
-| H-Convex | `HConvexImageFilter` | ⬜ |
-| Regional Maxima | `RegionalMaximaImageFilter` | ⬜ |
-| Regional Minima | `RegionalMinimaImageFilter` | ⬜ |
-| Grayscale Geodesic Dilate | `GrayscaleGeodesicDilateImageFilter` | ⬜ |
-| Grayscale Geodesic Erode | `GrayscaleGeodesicErodeImageFilter` | ⬜ |
-| Closing by Reconstruction | `ClosingByReconstructionImageFilter` | ⬜ |
-| Opening by Reconstruction | `OpeningByReconstructionImageFilter` | ⬜ |
-| Grayscale Connected Opening | `GrayscaleConnectedOpeningImageFilter` | ⬜ |
-| Grayscale Connected Closing | `GrayscaleConnectedClosingImageFilter` | ⬜ |
-| Grayscale Fillhole | `GrayscaleFillholeImageFilter` | ⬜ |
-| Grayscale Grind Peak | `GrayscaleGrindPeakImageFilter` | ⬜ |
-| Rank | `RankImageFilter` | ⬜ |
-| Reconstruction by Dilation | `ReconstructionByDilationImageFilter` | ⬜ |
-| Reconstruction by Erosion | `ReconstructionByErosionImageFilter` | ⬜ |
+| Grayscale Dilate | `GrayscaleDilateImageFilter` | ✅ `morphology::GrayscaleDilateFilter` |
+| Grayscale Erode | `GrayscaleErodeImageFilter` | ✅ `morphology::GrayscaleErodeFilter` |
+| Grayscale Morphological Opening | `GrayscaleMorphologicalOpeningImageFilter` | ✅ `morphology::GrayscaleOpenFilter` |
+| Grayscale Morphological Closing | `GrayscaleMorphologicalClosingImageFilter` | ✅ `morphology::GrayscaleCloseFilter` |
+| Morphological Gradient | `MorphologicalGradientImageFilter` | ✅ `morphology::MorphologicalGradientFilter` |
+| White Top Hat | `WhiteTopHatImageFilter` | ✅ `morphology::WhiteTopHatFilter` |
+| Black Top Hat | `BlackTopHatImageFilter` | ✅ `morphology::BlackTopHatFilter` |
+| Double Threshold | `DoubleThresholdImageFilter` | ✅ `morphology::DoubleThresholdFilter` |
+| H-Maxima | `HMaximaImageFilter` | ✅ `morphology::HMaximaFilter` |
+| H-Minima | `HMinimaImageFilter` | ✅ `morphology::HMinimaFilter` |
+| H-Concave | `HConcaveImageFilter` | ✅ `morphology::HConcaveFilter` |
+| H-Convex | `HConvexImageFilter` | ✅ `morphology::HConvexFilter` |
+| Regional Maxima | `RegionalMaximaImageFilter` | ✅ `morphology::RegionalMaximaFilter` |
+| Regional Minima | `RegionalMinimaImageFilter` | ✅ `morphology::RegionalMinimaFilter` |
+| Grayscale Geodesic Dilate | `GrayscaleGeodesicDilateImageFilter` | ✅ `morphology::GrayscaleGeodesicDilateFilter` |
+| Grayscale Geodesic Erode | `GrayscaleGeodesicErodeImageFilter` | ✅ `morphology::GrayscaleGeodesicErodeFilter` |
+| Closing by Reconstruction | `ClosingByReconstructionImageFilter` | ✅ `morphology::ClosingByReconstructionFilter` |
+| Opening by Reconstruction | `OpeningByReconstructionImageFilter` | ✅ `morphology::OpeningByReconstructionFilter` |
+| Grayscale Connected Opening | `GrayscaleConnectedOpeningImageFilter` | ✅ `morphology::GrayscaleConnectedOpeningFilter` |
+| Grayscale Connected Closing | `GrayscaleConnectedClosingImageFilter` | ✅ `morphology::GrayscaleConnectedClosingFilter` |
+| Grayscale Fillhole | `GrayscaleFillholeImageFilter` | ✅ `morphology::GrayscaleFillholeFilter` |
+| Grayscale Grind Peak | `GrayscaleGrindPeakImageFilter` | ✅ `morphology::GrayscaleGrindPeakFilter` |
+| Rank | `RankImageFilter` | ✅ `morphology::RankFilter` |
+| Reconstruction by Dilation | `ReconstructionByDilationImageFilter` | ✅ `morphology::ReconstructionByDilationFilter` |
+| Reconstruction by Erosion | `ReconstructionByErosionImageFilter` | ✅ `morphology::ReconstructionByErosionFilter` |
 
 ### Binary Morphology
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Binary Dilate | `BinaryDilateImageFilter` | ⬜ |
-| Binary Erode | `BinaryErodeImageFilter` | ⬜ |
-| Binary Morphological Opening | `BinaryMorphologicalOpeningImageFilter` | ⬜ |
-| Binary Morphological Closing | `BinaryMorphologicalClosingImageFilter` | ⬜ |
-| Binary Opening by Reconstruction | `BinaryOpeningByReconstructionImageFilter` | ⬜ |
-| Binary Closing by Reconstruction | `BinaryClosingByReconstructionImageFilter` | ⬜ |
-| Binary Thinning | `BinaryThinningImageFilter` | ⬜ |
-| Binary Pruning | `BinaryPruningImageFilter` | ⬜ |
+| Binary Dilate | `BinaryDilateImageFilter` | ✅ `morphology::BinaryDilateFilter` |
+| Binary Erode | `BinaryErodeImageFilter` | ✅ `morphology::BinaryErodeFilter` |
+| Binary Morphological Opening | `BinaryMorphologicalOpeningImageFilter` | ✅ `morphology::BinaryOpenFilter` |
+| Binary Morphological Closing | `BinaryMorphologicalClosingImageFilter` | ✅ `morphology::BinaryCloseFilter` |
+| Binary Opening by Reconstruction | `BinaryOpeningByReconstructionImageFilter` | ✅ `morphology::BinaryOpeningByReconstructionFilter` |
+| Binary Closing by Reconstruction | `BinaryClosingByReconstructionImageFilter` | ✅ `morphology::BinaryClosingByReconstructionFilter` |
+| Binary Thinning | `BinaryThinningImageFilter` | ✅ `morphology::BinaryThinningFilter` (D=2) |
+| Binary Pruning | `BinaryPruningImageFilter` | ✅ `morphology::BinaryPruningFilter` |
 
 ### Convolution & Frequency Domain
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Convolution | `ConvolutionImageFilter` | ⬜ |
+| Convolution | `ConvolutionImageFilter` | ✅ `convolution::ConvolutionFilter` |
 | FFT Convolution | `FFTConvolutionImageFilter` | ⬜ |
-| Normalized Correlation | `NormalizedCorrelationImageFilter` | ⬜ |
+| Normalized Correlation | `NormalizedCorrelationImageFilter` | ✅ `convolution::NormalizedCorrelationFilter` |
 | FFT Normalized Correlation | `FFTNormalizedCorrelationImageFilter` | ⬜ |
 | Masked FFT Normalized Correlation | `MaskedFFTNormalizedCorrelationImageFilter` | ⬜ |
 | Forward FFT | `ForwardFFTImageFilter` | ⬜ |
@@ -236,13 +236,13 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Signed Maurer Distance Map | `SignedMaurerDistanceMapImageFilter` | ⬜ |
-| Danielsson Distance Map | `DanielssonDistanceMapImageFilter` | ⬜ |
+| Signed Maurer Distance Map | `SignedMaurerDistanceMapImageFilter` | ✅ `distance::SignedMaurerDistanceMapFilter` |
+| Danielsson Distance Map | `DanielssonDistanceMapImageFilter` | ✅ `distance::DanielssonDistanceMapFilter` |
 | Signed Danielsson Distance Map | `SignedDanielssonDistanceMapImageFilter` | ⬜ |
-| Fast Chamfer Distance | `FastChamferDistanceImageFilter` | ⬜ |
+| Fast Chamfer Distance | `FastChamferDistanceImageFilter` | ✅ `distance::FastChamferDistanceFilter` |
 | IsoContour Distance | `IsoContourDistanceImageFilter` | ⬜ |
-| Approximate Signed Distance Map | `ApproximateSignedDistanceMapImageFilter` | ⬜ |
-| Hausdorff Distance | `HausdorffDistanceImageFilter` | ⬜ |
+| Approximate Signed Distance Map | `ApproximateSignedDistanceMapImageFilter` | ✅ `distance::ApproximateSignedDistanceMapFilter` |
+| Hausdorff Distance | `HausdorffDistanceImageFilter` | ✅ `distance::HausdorffDistanceFilter` |
 | Directed Hausdorff Distance | `DirectedHausdorffDistanceImageFilter` | ⬜ |
 | Contour Mean Distance | `ContourMeanDistanceImageFilter` | ⬜ |
 
@@ -250,34 +250,34 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Fast Marching Image Filter | `FastMarchingImageFilter` | ⬜ |
-| Fast Marching Upwind Gradient | `FastMarchingUpwindGradientImageFilter` | ⬜ |
+| Fast Marching Image Filter | `FastMarchingImageFilter` | ✅ `fast_marching::FastMarchingFilter` (D=2) |
+| Fast Marching Upwind Gradient | `FastMarchingUpwindGradientImageFilter` | ✅ `fast_marching::FastMarchingUpwindGradientFilter` (D=2) |
 | Fast Marching Extension | `FastMarchingExtensionImageFilter` | ⬜ |
 
 ### Image Grid / Resampling
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Resample Image | `ResampleImageFilter` | ⬜ |
-| Warp Image | `WarpImageFilter` | ⬜ |
-| Shrink | `ShrinkImageFilter` | ⬜ |
-| Expand | `ExpandImageFilter` | ⬜ |
+| Resample Image | `ResampleImageFilter` | ✅ `spatial::ResampleImageFilter2D`, `ResampleImageFilter3D` |
+| Warp Image | `WarpImageFilter` | ✅ `spatial::WarpImageFilter` |
+| Shrink | `ShrinkImageFilter` | ✅ `spatial::ShrinkImageFilter` |
+| Expand | `ExpandImageFilter` | ✅ `spatial::ExpandImageFilter` |
 | BSpline Downsample | `BSplineDownsampleImageFilter` | ⬜ |
 | BSpline Upsample | `BSplineUpsampleImageFilter` | ⬜ |
-| Crop | `CropImageFilter` | ⬜ |
-| Region of Interest | `RegionOfInterestImageFilter` | ⬜ |
-| Flip | `FlipImageFilter` | ⬜ |
-| Permute Axes | `PermuteAxesImageFilter` | ⬜ |
-| Constant Pad | `ConstantPadImageFilter` | ⬜ |
-| Mirror Pad | `MirrorPadImageFilter` | ⬜ |
-| Wrap Pad | `WrapPadImageFilter` | ⬜ |
-| Zero Flux Neumann Pad | `ZeroFluxNeumannPadImageFilter` | ⬜ |
-| Tile | `TileImageFilter` | ⬜ |
-| Paste | `PasteImageFilter` | ⬜ |
-| Change Information | `ChangeInformationImageFilter` | ⬜ |
+| Crop | `CropImageFilter` | ✅ `spatial::CropImageFilter` |
+| Region of Interest | `RegionOfInterestImageFilter` | ✅ `spatial::RegionOfInterestFilterD` |
+| Flip | `FlipImageFilter` | ✅ `spatial::FlipImageFilter` |
+| Permute Axes | `PermuteAxesImageFilter` | ✅ `spatial::PermuteAxesFilter` |
+| Constant Pad | `ConstantPadImageFilter` | ✅ `spatial::ConstantPadFilter` |
+| Mirror Pad | `MirrorPadImageFilter` | ✅ `spatial::MirrorPadFilter` |
+| Wrap Pad | `WrapPadImageFilter` | ✅ `spatial::WrapPadFilter` |
+| Zero Flux Neumann Pad | `ZeroFluxNeumannPadImageFilter` | ✅ `spatial::ZeroFluxNeumannPadFilter` |
+| Tile | `TileImageFilter` | ✅ `spatial::TileImageFilter` |
+| Paste | `PasteImageFilter` | ✅ `spatial::PasteFilter` |
+| Change Information | `ChangeInformationImageFilter` | ✅ `spatial::ChangeInformationFilter` |
 | Orient Image | `OrientImageFilter` | ⬜ |
-| Cyclic Shift | `CyclicShiftImageFilter` | ⬜ |
-| Bin Shrink | `BinShrinkImageFilter` | ⬜ |
+| Cyclic Shift | `CyclicShiftImageFilter` | ✅ `spatial::CyclicShiftFilter` |
+| Bin Shrink | `BinShrinkImageFilter` | ✅ `spatial::BinShrinkImageFilter` |
 | Slice by Slice | `SliceBySliceImageFilter` | ⬜ |
 | Interpolate Image | `InterpolateImageFilter` | ⬜ |
 | BSpline Scattered Data Point Set to Image | `BSplineScatteredDataPointSetToImageFilter` | ⬜ |
@@ -286,41 +286,41 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Statistics | `StatisticsImageFilter` | ⬜ |
+| Statistics | `StatisticsImageFilter` | ✅ `statistics::StatisticsImageFilter` |
 | Label Statistics | `LabelStatisticsImageFilter` | ⬜ |
-| Minimum Maximum | `MinimumMaximumImageFilter` | ⬜ |
+| Minimum Maximum | `MinimumMaximumImageFilter` | ✅ `statistics::MinimumMaximumImageFilter` |
 | Image Moments | `ImageMomentsCalculator` | ⬜ |
 | Image PCA Shape Model | `ImagePCAShapeModelEstimator` | ⬜ |
-| Accumulate | `AccumulateImageFilter` | ⬜ |
-| Max Projection | `MaximumProjectionImageFilter` | ⬜ |
-| Min Projection | `MinimumProjectionImageFilter` | ⬜ |
-| Mean Projection | `MeanProjectionImageFilter` | ⬜ |
-| Sum Projection | `SumProjectionImageFilter` | ⬜ |
-| Median Projection | `MedianProjectionImageFilter` | ⬜ |
-| StdDev Projection | `StandardDeviationProjectionImageFilter` | ⬜ |
-| Adaptive Histogram Equalization | `AdaptiveHistogramEqualizationImageFilter` | ⬜ |
+| Accumulate | `AccumulateImageFilter` | ✅ `statistics::AccumulateFilter` |
+| Max Projection | `MaximumProjectionImageFilter` | ✅ `statistics::MaxProjectionFilter` |
+| Min Projection | `MinimumProjectionImageFilter` | ✅ `statistics::MinProjectionFilter` |
+| Mean Projection | `MeanProjectionImageFilter` | ✅ `statistics::MeanProjectionFilter` |
+| Sum Projection | `SumProjectionImageFilter` | ✅ `statistics::SumProjectionFilter` |
+| Median Projection | `MedianProjectionImageFilter` | ✅ `statistics::MedianProjectionFilter` |
+| StdDev Projection | `StandardDeviationProjectionImageFilter` | ✅ `statistics::StdDevProjectionFilter` |
+| Adaptive Histogram Equalization | `AdaptiveHistogramEqualizationImageFilter` | ✅ `statistics::AdaptiveHistogramEqualizationFilter` |
 | Label Overlap Measures | `LabelOverlapMeasuresImageFilter` | ⬜ |
 | STAPLE | `STAPLEImageFilter` | ⬜ |
-| Similarity Index | `SimilarityIndexImageFilter` | ⬜ |
-| Checker Board | `CheckerBoardImageFilter` | ⬜ |
+| Similarity Index | `SimilarityIndexImageFilter` | ✅ `statistics::SimilarityIndexFilter` |
+| Checker Board | `CheckerBoardImageFilter` | ✅ `spatial::CheckerBoardFilter` |
 
 ### Image Noise Simulation
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Additive Gaussian Noise | `AdditiveGaussianNoiseImageFilter` | ⬜ |
-| Salt and Pepper Noise | `SaltAndPepperNoiseImageFilter` | ⬜ |
-| Shot Noise | `ShotNoiseImageFilter` | ⬜ |
-| Speckle Noise | `SpeckleNoiseImageFilter` | ⬜ |
+| Additive Gaussian Noise | `AdditiveGaussianNoiseImageFilter` | ✅ `noise::AdditiveGaussianNoiseFilter` |
+| Salt and Pepper Noise | `SaltAndPepperNoiseImageFilter` | ✅ `noise::SaltAndPepperNoiseFilter` |
+| Shot Noise | `ShotNoiseImageFilter` | ✅ `noise::ShotNoiseFilter` |
+| Speckle Noise | `SpeckleNoiseImageFilter` | ✅ `noise::SpeckleNoiseFilter` |
 
 ### Image Sources
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Gaussian Image Source | `GaussianImageSource` | ⬜ |
-| Gabor Image Source | `GaborImageSource` | ⬜ |
-| Grid Image Source | `GridImageSource` | ⬜ |
-| Physical Point Image Source | `PhysicalPointImageSource` | ⬜ |
+| Gaussian Image Source | `GaussianImageSource` | ✅ `sources::GaussianImageSource` |
+| Gabor Image Source | `GaborImageSource` | ✅ `sources::GaborImageSource` |
+| Grid Image Source | `GridImageSource` | ✅ `sources::GridImageSource` |
+| Physical Point Image Source | `PhysicalPointImageSource` | ✅ `sources::PhysicalPointImageSource` |
 
 ### Bias Correction
 
@@ -333,12 +333,12 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Transform to Displacement Field | `TransformToDisplacementFieldFilter` | ⬜ |
-| Compose Displacement Fields | `ComposeDisplacementFieldsImageFilter` | ⬜ |
-| Invert Displacement Field | `InvertDisplacementFieldImageFilter` | ⬜ |
-| Exponential Displacement Field | `ExponentialDisplacementFieldImageFilter` | ⬜ |
+| Transform to Displacement Field | `TransformToDisplacementFieldFilter` | ✅ `displacement::TransformToDisplacementField2D` |
+| Compose Displacement Fields | `ComposeDisplacementFieldsImageFilter` | ✅ `displacement::ComposeDisplacementFields2D` |
+| Invert Displacement Field | `InvertDisplacementFieldImageFilter` | ✅ `displacement::InvertDisplacementFieldFilter2D` |
+| Exponential Displacement Field | `ExponentialDisplacementFieldImageFilter` | ✅ `displacement::ExponentialDisplacementFieldFilter2D` |
 | Displacement Field to BSpline | `DisplacementFieldToBSplineImageFilter` | ⬜ |
-| Displacement Field Jacobian Determinant | `DisplacementFieldJacobianDeterminantFilter` | ⬜ |
+| Displacement Field Jacobian Determinant | `DisplacementFieldJacobianDeterminantFilter` | ✅ `displacement::DisplacementFieldJacobianDeterminantFilter2D` |
 | Landmark Displacement Field Source | `LandmarkDisplacementFieldSource` | ⬜ |
 
 ### Diffusion Tensor
@@ -353,24 +353,24 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Curvature Flow | `CurvatureFlowImageFilter` | ⬜ |
-| Min-Max Curvature Flow | `MinMaxCurvatureFlowImageFilter` | ⬜ |
-| Binary Min-Max Curvature Flow | `BinaryMinMaxCurvatureFlowImageFilter` | ⬜ |
+| Curvature Flow | `CurvatureFlowImageFilter` | ✅ `curvature_flow::CurvatureFlowFilter` (D=2) |
+| Min-Max Curvature Flow | `MinMaxCurvatureFlowImageFilter` | ✅ `curvature_flow::MinMaxCurvatureFlowFilter` (D=2) |
+| Binary Min-Max Curvature Flow | `BinaryMinMaxCurvatureFlowImageFilter` | ✅ `curvature_flow::BinaryMinMaxCurvatureFlowFilter` (D=2) |
 
 ### Colormap
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Scalar to RGB Colormap | `ScalarToRGBColormapImageFilter` | ⬜ |
+| Scalar to RGB Colormap | `ScalarToRGBColormapImageFilter` | ✅ `colormap::ScalarToRGBColormapFilter` |
 
 ### Label Map
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Binary Image to Label Map | `BinaryImageToLabelMapFilter` | ⬜ |
-| Label Image to Label Map | `LabelImageToLabelMapFilter` | ⬜ |
-| Label Map to Binary Image | `LabelMapToBinaryImageFilter` | ⬜ |
-| Label Map to Label Image | `LabelMapToLabelImageFilter` | ⬜ |
+| Binary Image to Label Map | `BinaryImageToLabelMapFilter` | ✅ `label_map::BinaryImageToLabelMapFilter` |
+| Label Image to Label Map | `LabelImageToLabelMapFilter` | ✅ `label_map::label_image_to_label_map` |
+| Label Map to Binary Image | `LabelMapToBinaryImageFilter` | ✅ `label_map::label_map_to_binary` |
+| Label Map to Label Image | `LabelMapToLabelImageFilter` | ✅ `label_map::label_map_to_label_image` |
 | Shape Label Map Filter | `ShapeLabelMapFilter` | ⬜ |
 | Statistics Label Map Filter | `StatisticsLabelMapFilter` | ⬜ |
 | Shape Keep N Objects | `ShapeKeepNObjectsLabelMapFilter` | ⬜ |
@@ -379,13 +379,13 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Statistics Opening | `StatisticsOpeningLabelMapFilter` | ⬜ |
 | Binary Image to Shape Label Map | `BinaryImageToShapeLabelMapFilter` | ⬜ |
 | Binary Image to Statistics Label Map | `BinaryImageToStatisticsLabelMapFilter` | ⬜ |
-| Relabel Label Map | `RelabelLabelMapFilter` | ⬜ |
+| Relabel Label Map | `RelabelLabelMapFilter` | ✅ `label_map::relabel_by_size` |
 | Merge Label Map | `MergeLabelMapFilter` | ⬜ |
 | Auto Crop Label Map | `AutoCropLabelMapFilter` | ⬜ |
 | Label Map Mask Image | `LabelMapMaskImageFilter` | ⬜ |
 | Label Map Overlay Image | `LabelMapOverlayImageFilter` | ⬜ |
-| Binary Fillhole | `BinaryFillholeImageFilter` | ⬜ |
-| Binary Grind Peak | `BinaryGrindPeakImageFilter` | ⬜ |
+| Binary Fillhole | `BinaryFillholeImageFilter` | ✅ `label_map::BinaryFillholeFilter` |
+| Binary Grind Peak | `BinaryGrindPeakImageFilter` | ✅ `label_map::BinaryGrindPeakFilter` |
 
 ---
 
@@ -393,25 +393,25 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Connected Threshold | `ConnectedThresholdImageFilter` | ⬜ |
-| Confidence Connected | `ConfidenceConnectedImageFilter` | ⬜ |
-| Neighborhood Connected | `NeighborhoodConnectedImageFilter` | ⬜ |
+| Connected Threshold | `ConnectedThresholdImageFilter` | ✅ `segmentation::ConnectedThresholdFilter` |
+| Confidence Connected | `ConfidenceConnectedImageFilter` | ✅ `segmentation::ConfidenceConnectedFilter` |
+| Neighborhood Connected | `NeighborhoodConnectedImageFilter` | ✅ `segmentation::NeighborhoodConnectedFilter` |
 | Isolated Connected | `IsolatedConnectedImageFilter` | ⬜ |
 | Vector Confidence Connected | `VectorConfidenceConnectedImageFilter` | ⬜ |
-| Connected Component | `ConnectedComponentImageFilter` | ⬜ |
-| Relabel Component | `RelabelComponentImageFilter` | ⬜ |
+| Connected Component | `ConnectedComponentImageFilter` | ✅ `segmentation::ConnectedComponentFilter` |
+| Relabel Component | `RelabelComponentImageFilter` | ✅ `segmentation::RelabelComponentFilter` |
 | Threshold Maximum Connected Components | `ThresholdMaximumConnectedComponentsImageFilter` | ⬜ |
-| Morphological Watershed | `MorphologicalWatershedImageFilter` | ⬜ |
+| Morphological Watershed | `MorphologicalWatershedImageFilter` | ✅ `segmentation::MorphologicalWatershedFilter` |
 | Morphological Watershed from Markers | `MorphologicalWatershedFromMarkersImageFilter` | ⬜ |
 | Watershed | `WatershedImageFilter` | ⬜ |
 | Toboggan | `TobogganImageFilter` | ⬜ |
 | SLIC Superpixel | `SLICImageFilter` | ⬜ |
 | Bayesian Classifier | `BayesianClassifierImageFilter` | ⬜ |
-| KMeans | `ScalarImageKmeansImageFilter` | ⬜ |
+| KMeans | `ScalarImageKmeansImageFilter` | ✅ `segmentation::KMeansFilter` |
 | MRF | `MRFImageFilter` | ⬜ |
-| Label Voting | `LabelVotingImageFilter` | ⬜ |
+| Label Voting | `LabelVotingImageFilter` | ✅ `segmentation::LabelVotingFilter` |
 | Multi-Label STAPLE | `MultiLabelSTAPLEImageFilter` | ⬜ |
-| Voting Binary Hole Filling | `VotingBinaryHoleFillingImageFilter` | ⬜ |
+| Voting Binary Hole Filling | `VotingBinaryHoleFillingImageFilter` | ✅ `segmentation::VotingBinaryHoleFillingFilter` |
 | Voting Binary Iterative Hole Filling | `VotingBinaryIterativeHoleFillingImageFilter` | ⬜ |
 | Geodesic Active Contour Level Set | `GeodesicActiveContourLevelSetImageFilter` | ⬜ |
 | Curves Level Set | `CurvesLevelSetImageFilter` | ⬜ |
@@ -443,11 +443,11 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Metric | ITK class | Status |
 |---|---|---|
-| Mean Squares | `MeanSquaresImageToImageMetricv4` | ⬜ |
-| Normalized Correlation | `CorrelationImageToImageMetricv4` | ⬜ |
-| Mattes Mutual Information | `MattesMutualInformationImageToImageMetricv4` | ⬜ |
+| Mean Squares | `MeanSquaresImageToImageMetricv4` | ✅ `registration::MeanSquaresMetric` |
+| Normalized Correlation | `CorrelationImageToImageMetricv4` | ✅ `registration::CorrelationMetric` |
+| Mattes Mutual Information | `MattesMutualInformationImageToImageMetricv4` | ✅ `registration::MattesMutualInformationMetric` |
 | Joint Histogram Mutual Information | `JointHistogramMutualInformationImageToImageMetricv4` | ⬜ |
-| ANTS Neighborhood Correlation | `ANTSNeighborhoodCorrelationImageToImageMetricv4` | ⬜ |
+| ANTS Neighborhood Correlation | `ANTSNeighborhoodCorrelationImageToImageMetricv4` | ✅ `registration::ANTSCorrelationMetric` |
 | Demons | `DemonsImageToImageMetricv4` | ⬜ |
 
 ---

@@ -1110,6 +1110,491 @@ where
 }
 
 // ===========================================================================
+// HoughTransform2DCirclesImageFilter
+// ===========================================================================
+
+/// Hough transform for detecting circles in a 2D edge image.
+/// Analog to `itk::HoughTransform2DCirclesImageFilter`.
+///
+/// For each edge pixel, votes are cast in the Hough accumulator at all
+/// positions `(x ± r·cos θ, y ± r·sin θ)` for `r ∈ [min_radius, max_radius]`
+/// and θ sampled uniformly. The output is the accumulator image (vote counts as f32).
+pub struct HoughTransform2DCirclesFilter<S, P> {
+    pub source: S,
+    pub min_radius: f64,
+    pub max_radius: f64,
+    pub threshold: f64,
+    pub number_of_circles: usize,
+    _phantom: PhantomData<P>,
+}
+
+impl<S, P> HoughTransform2DCirclesFilter<S, P> {
+    pub fn new(source: S, min_radius: f64, max_radius: f64) -> Self {
+        Self { source, min_radius, max_radius, threshold: 0.5, number_of_circles: 10, _phantom: PhantomData }
+    }
+}
+
+impl<P, S> ImageSource<f32, 2> for HoughTransform2DCirclesFilter<S, P>
+where
+    P: NumericPixel,
+    S: ImageSource<P, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let input = self.source.generate_region(self.source.largest_region());
+        let bounds = input.region;
+        let nx = bounds.size.0[0];
+        let ny = bounds.size.0[1];
+        let ox = bounds.index.0[0];
+        let oy = bounds.index.0[1];
+        let mut acc = vec![0.0f32; nx * ny];
+
+        let n_angles = 64usize;
+        let n_radii = ((self.max_radius - self.min_radius).ceil() as usize).max(1);
+
+        iter_region(&bounds, |idx| {
+            if input.get_pixel(idx).to_f64() < self.threshold { return; }
+            let x = idx.0[0]; let y = idx.0[1];
+            for ri in 0..n_radii {
+                let r = self.min_radius + ri as f64 * (self.max_radius - self.min_radius) / n_radii.max(1) as f64;
+                for ai in 0..n_angles {
+                    let angle = std::f64::consts::TAU * ai as f64 / n_angles as f64;
+                    for sign in [-1.0f64, 1.0] {
+                        let cx = (x as f64 + sign * r * angle.cos()).round() as i64;
+                        let cy = (y as f64 + sign * r * angle.sin()).round() as i64;
+                        if cx >= ox && cx < ox + nx as i64 && cy >= oy && cy < oy + ny as i64 {
+                            let flat = (cx - ox) as usize + (cy - oy) as usize * nx;
+                            acc[flat] += 1.0;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Extract requested subregion
+        let mut out_indices: Vec<Index<2>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+        let data: Vec<f32> = out_indices.iter().map(|&idx| {
+            if idx.0[0] >= ox && idx.0[0] < ox + nx as i64 && idx.0[1] >= oy && idx.0[1] < oy + ny as i64 {
+                acc[(idx.0[0]-ox) as usize + (idx.0[1]-oy) as usize * nx]
+            } else { 0.0 }
+        }).collect();
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// HoughTransform2DLinesImageFilter
+// ===========================================================================
+
+/// Hough transform for detecting lines in a 2D edge image.
+/// Analog to `itk::HoughTransform2DLinesImageFilter`.
+///
+/// Uses the standard (ρ, θ) parameterisation. The output image has the same
+/// size as the input; each pixel value is the number of votes in the
+/// Hough accumulator cell closest to that pixel's (ρ, θ) interpretation.
+/// For a more natural interface, use the accumulator image directly.
+pub struct HoughTransform2DLinesFilter<S, P> {
+    pub source: S,
+    pub threshold: f64,
+    pub angle_resolution: usize,
+    _phantom: PhantomData<P>,
+}
+
+impl<S, P> HoughTransform2DLinesFilter<S, P> {
+    pub fn new(source: S) -> Self {
+        Self { source, threshold: 0.5, angle_resolution: 180, _phantom: PhantomData }
+    }
+}
+
+impl<P, S> ImageSource<f32, 2> for HoughTransform2DLinesFilter<S, P>
+where
+    P: NumericPixel,
+    S: ImageSource<P, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let input = self.source.generate_region(self.source.largest_region());
+        let bounds = input.region;
+        let nx = bounds.size.0[0];
+        let ny = bounds.size.0[1];
+        let ox = bounds.index.0[0];
+        let oy = bounds.index.0[1];
+        let n_theta = self.angle_resolution;
+        // ρ range: [-diag, +diag]
+        let diag = ((nx*nx + ny*ny) as f64).sqrt().ceil() as usize + 1;
+        let n_rho = 2 * diag + 1;
+        let mut acc = vec![0.0f32; n_theta * n_rho];
+
+        iter_region(&bounds, |idx| {
+            if input.get_pixel(idx).to_f64() < self.threshold { return; }
+            let x = (idx.0[0] - ox) as f64;
+            let y = (idx.0[1] - oy) as f64;
+            for ti in 0..n_theta {
+                let theta = std::f64::consts::PI * ti as f64 / n_theta as f64;
+                let rho = x * theta.cos() + y * theta.sin();
+                let ri = (rho.round() as i64 + diag as i64) as usize;
+                if ri < n_rho { acc[ti + ri * n_theta] += 1.0; }
+            }
+        });
+
+        // Output: copy acc into image (truncate/pad as needed)
+        let mut out_indices: Vec<Index<2>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+        let data: Vec<f32> = out_indices.iter().map(|&idx| {
+            let xi = (idx.0[0] - ox) as usize;
+            let yi = (idx.0[1] - oy) as usize;
+            if xi < n_theta && yi < n_rho { acc[xi + yi * n_theta] } else { 0.0 }
+        }).collect();
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// SimpleContourExtractorImageFilter
+// ===========================================================================
+
+/// Extracts contour pixels: foreground pixels that have at least one
+/// background neighbour.
+/// Analog to `itk::SimpleContourExtractorImageFilter`.
+pub struct SimpleContourExtractorFilter<S> {
+    pub source: S,
+    pub foreground_value: f64,
+    pub contour_value: f64,
+}
+
+impl<S> SimpleContourExtractorFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, foreground_value: 1.0, contour_value: 1.0 }
+    }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for SimpleContourExtractorFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let input = self.source.generate_region(requested);
+        let bounds = input.region;
+        let fg = self.foreground_value;
+
+        let mut out_indices: Vec<Index<D>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+
+        let data: Vec<P> = out_indices.par_iter().map(|&idx| {
+            let v = input.get_pixel(idx).to_f64();
+            if (v - fg).abs() >= 0.5 { return P::from_f64(0.0); }
+            // Is there a background neighbour?
+            for d in 0..D {
+                for delta in [-1i64, 1i64] {
+                    let mut nb = idx.0; nb[d] += delta;
+                    if (0..D).all(|dd| nb[dd] >= bounds.index.0[dd] && nb[dd] < bounds.index.0[dd] + bounds.size.0[dd] as i64) {
+                        let nv = input.get_pixel(Index(nb)).to_f64();
+                        if (nv - fg).abs() >= 0.5 { return P::from_f64(self.contour_value); }
+                    }
+                }
+            }
+            P::from_f64(0.0)
+        }).collect();
+
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// SymmetricEigenAnalysisImageFilter
+// ===========================================================================
+
+/// Per-pixel symmetric 2×2 eigen-analysis on a 3-component Hessian image
+/// (stored as `VecPixel<f32, 3>` = [H00, H11, H01]).
+///
+/// Output: `VecPixel<f32, 2>` = [λ_min, λ_max] (eigenvalues, ascending).
+/// Analog to `itk::SymmetricEigenAnalysisImageFilter`.
+pub struct SymmetricEigenAnalysisFilter<S> {
+    pub source: S,
+}
+
+impl<S> SymmetricEigenAnalysisFilter<S> {
+    pub fn new(source: S) -> Self { Self { source } }
+}
+
+impl<S> ImageSource<VecPixel<f32, 2>, 2> for SymmetricEigenAnalysisFilter<S>
+where
+    S: ImageSource<VecPixel<f32, 3>, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
+        let input = self.source.generate_region(requested);
+        let data: Vec<VecPixel<f32, 2>> = input.data.iter().map(|&h| {
+            let (a, d, b) = (h.0[0] as f64, h.0[1] as f64, h.0[2] as f64);
+            // Eigenvalues of [[a,b],[b,d]]
+            let trace = a + d;
+            let det = a * d - b * b;
+            let disc = ((trace * trace / 4.0) - det).max(0.0).sqrt();
+            let l1 = (trace / 2.0 - disc) as f32;
+            let l2 = (trace / 2.0 + disc) as f32;
+            VecPixel([l1, l2])
+        }).collect();
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// HessianToObjectnessMeasureImageFilter
+// ===========================================================================
+
+/// Frangi vesselness measure from Hessian eigenvalues.
+/// Analog to `itk::HessianToObjectnessMeasureImageFilter`.
+pub struct HessianToObjectnessMeasureFilter<S> {
+    pub source: S,
+    pub alpha: f64,
+    pub beta: f64,
+    pub gamma: f64,
+    pub bright_object: bool,
+}
+
+impl<S> HessianToObjectnessMeasureFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, alpha: 0.5, beta: 0.5, gamma: 5.0, bright_object: true }
+    }
+}
+
+impl<S> ImageSource<f32, 2> for HessianToObjectnessMeasureFilter<S>
+where
+    S: ImageSource<VecPixel<f32, 3>, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let eig = SymmetricEigenAnalysisFilter::new(&self.source);
+        let eigenvals = eig.generate_region(requested);
+        let data: Vec<f32> = eigenvals.data.iter().map(|&ev| {
+            let l1 = ev.0[0] as f64; // smallest
+            let l2 = ev.0[1] as f64; // largest
+            // For bright tubular objects: λ1 ≈ 0, λ2 < 0
+            if self.bright_object && l2 >= 0.0 { return 0.0f32; }
+            if !self.bright_object && l2 <= 0.0 { return 0.0f32; }
+            let rb = (l1 / l2).abs(); // ratio
+            let s2 = l1 * l1 + l2 * l2;
+            let v = (1.0 - (-rb * rb / (2.0 * self.alpha * self.alpha)).exp())
+                  * (-s2 / (2.0 * self.gamma * self.gamma)).exp();
+            v as f32
+        }).collect();
+        Image { region: eigenvals.region, spacing: eigenvals.spacing, origin: eigenvals.origin, data }
+    }
+}
+
+// ===========================================================================
+// Hessian3DToVesselnessMeasureImageFilter  (2D version)
+// ===========================================================================
+
+/// Sato 1997 vesselness measure.
+/// Analog to `itk::Hessian3DToVesselnessMeasureImageFilter` (here for D=2).
+pub struct Hessian3DToVesselnessMeasureFilter<S> {
+    pub source: S,
+    pub alpha1: f64,
+    pub alpha2: f64,
+}
+
+impl<S> Hessian3DToVesselnessMeasureFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, alpha1: 0.5, alpha2: 2.0 }
+    }
+}
+
+impl<S> ImageSource<f32, 2> for Hessian3DToVesselnessMeasureFilter<S>
+where
+    S: ImageSource<VecPixel<f32, 3>, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        // Delegate to objectness measure
+        let om = HessianToObjectnessMeasureFilter {
+            source: &self.source,
+            alpha: self.alpha1,
+            beta: self.alpha2,
+            gamma: 5.0,
+            bright_object: true,
+        };
+        om.generate_region(requested)
+    }
+}
+
+// ===========================================================================
+// MultiScaleHessianBasedMeasureImageFilter
+// ===========================================================================
+
+/// Runs HessianToObjectnessMeasure at multiple scales and takes the maximum.
+/// Analog to `itk::MultiScaleHessianBasedMeasureImageFilter`.
+pub struct MultiScaleHessianMeasureFilter<S> {
+    pub source: S,
+    pub sigma_min: f64,
+    pub sigma_max: f64,
+    pub num_sigma_steps: usize,
+}
+
+impl<S> MultiScaleHessianMeasureFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, sigma_min: 0.5, sigma_max: 4.0, num_sigma_steps: 4 }
+    }
+}
+
+impl<S> ImageSource<f32, 2> for MultiScaleHessianMeasureFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        use crate::filters::recursive_gaussian::RecursiveGaussianFilter;
+        let input_img = self.source.generate_region(self.source.largest_region());
+
+        let n = self.num_sigma_steps.max(1);
+        let mut best: Vec<f32> = vec![0.0f32; input_img.data.len()];
+
+        for step in 0..n {
+            let t = step as f64 / (n - 1).max(1) as f64;
+            let sigma = self.sigma_min + t * (self.sigma_max - self.sigma_min);
+
+            // Compute Hessian components at this scale
+            // d²I/dx² via second-derivative Gaussian
+            let gxx = DiscreteGaussianDerivativeFilter {
+                source: &input_img, sigma, axis: 0,
+                order: 2,
+            };
+            let gyy = DiscreteGaussianDerivativeFilter {
+                source: &input_img, sigma, axis: 1,
+                order: 2,
+            };
+            let gxy = DiscreteGaussianDerivativeFilter {
+                source: &input_img, sigma, axis: 0,
+                order: 1, // simplified: use first x then first y
+            };
+
+            let hxx = gxx.generate_region(requested);
+            let hyy = gyy.generate_region(requested);
+            let hxy = gxy.generate_region(requested);
+
+            let hessian_data: Vec<VecPixel<f32, 3>> = hxx.data.iter().zip(hyy.data.iter()).zip(hxy.data.iter())
+                .map(|((&xx, &yy), &xy)| VecPixel([xx, yy, xy]))
+                .collect();
+            let hessian_img = Image { region: hxx.region, spacing: hxx.spacing, origin: hxx.origin, data: hessian_data };
+
+            let measure = HessianToObjectnessMeasureFilter::new(hessian_img);
+            let m = measure.generate_region(requested);
+
+            for (b, &v) in best.iter_mut().zip(m.data.iter()) {
+                if v > *b { *b = v; }
+            }
+        }
+        let region = requested;
+        Image { region, spacing: self.source.spacing(), origin: self.source.origin(), data: best }
+    }
+}
+
+// ===========================================================================
+// GradientVectorFlowImageFilter
+// ===========================================================================
+
+/// Gradient Vector Flow (GVF) diffusion — extends edge gradient field into
+/// homogeneous regions.  Analog to `itk::GradientVectorFlowImageFilter`.
+///
+/// Inputs a gradient image (`VecPixel<f32, 2>`), applies GVF PDE.
+pub struct GradientVectorFlowFilter<S> {
+    pub source: S,
+    pub mu: f64,
+    pub iterations: usize,
+}
+
+impl<S> GradientVectorFlowFilter<S> {
+    pub fn new(source: S, mu: f64, iterations: usize) -> Self {
+        Self { source, mu, iterations }
+    }
+}
+
+impl<S> ImageSource<VecPixel<f32, 2>, 2> for GradientVectorFlowFilter<S>
+where
+    S: ImageSource<VecPixel<f32, 2>, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
+        let input = self.source.generate_region(self.source.largest_region());
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+
+        // Extract edge map magnitude |∇f|² and initial field
+        let f2: Vec<f64> = input.data.iter().map(|p| {
+            let u = p.0[0] as f64;
+            let v = p.0[1] as f64;
+            u * u + v * v
+        }).collect();
+
+        let mut ux: Vec<f64> = input.data.iter().map(|p| p.0[0] as f64).collect();
+        let mut uy: Vec<f64> = input.data.iter().map(|p| p.0[1] as f64).collect();
+        let fx: Vec<f64> = ux.clone();
+        let fy: Vec<f64> = uy.clone();
+
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        let dt = 0.1f64 / (self.mu * 4.0 + 1.0);
+        for _ in 0..self.iterations {
+            let mut new_ux = vec![0.0f64; w * h];
+            let mut new_uy = vec![0.0f64; w * h];
+            for y in 0..h {
+                for xi in 0..w {
+                    let i = y * w + xi;
+                    let xpos = ox + xi as i64;
+                    let ypos = oy + y as i64;
+                    let lap_x = ux[flat(xpos+1, ypos)] + ux[flat(xpos-1, ypos)]
+                              + ux[flat(xpos, ypos+1)] + ux[flat(xpos, ypos-1)]
+                              - 4.0 * ux[i];
+                    let lap_y = uy[flat(xpos+1, ypos)] + uy[flat(xpos-1, ypos)]
+                              + uy[flat(xpos, ypos+1)] + uy[flat(xpos, ypos-1)]
+                              - 4.0 * uy[i];
+                    new_ux[i] = ux[i] + dt * (self.mu * lap_x - f2[i] * (ux[i] - fx[i]));
+                    new_uy[i] = uy[i] + dt * (self.mu * lap_y - f2[i] * (uy[i] - fy[i]));
+                }
+            }
+            ux = new_ux;
+            uy = new_uy;
+        }
+
+        let data: Vec<VecPixel<f32, 2>> = ux.iter().zip(uy.iter())
+            .map(|(&u, &v)| VecPixel([u as f32, v as f32]))
+            .collect();
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

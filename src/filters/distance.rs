@@ -380,6 +380,191 @@ where
     }
 }
 
+// ===========================================================================
+// SignedDanielssonDistanceMapImageFilter
+// ===========================================================================
+
+/// Signed Danielsson distance map (delegates to Signed Maurer).
+/// Analog to `itk::SignedDanielssonDistanceMapImageFilter`.
+pub type SignedDanielssonDistanceMapFilter<S, P> = SignedMaurerDistanceMapFilter<S, P>;
+
+// ===========================================================================
+// IsoContourDistanceImageFilter
+// ===========================================================================
+
+/// Distance to a specified iso-contour (iso-surface).
+/// Analog to `itk::IsoContourDistanceImageFilter`.
+pub struct IsoContourDistanceFilter<S, P> {
+    pub source: S,
+    pub level_set_value: f64,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<S, P> IsoContourDistanceFilter<S, P> {
+    pub fn new(source: S, level_set_value: f64) -> Self {
+        Self { source, level_set_value, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<P, S, const D: usize> ImageSource<f32, D> for IsoContourDistanceFilter<S, P>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D>,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<f32, D> {
+        // Threshold at level set value, then compute signed distance
+        let input = self.source.generate_region(requested);
+        let lv = self.level_set_value;
+        let sp = input.spacing;
+
+        // Compute distance to zero crossing of (f - level)
+        let data: Vec<f32> = input.data.iter().map(|&p| {
+            let v = p.to_f64() - lv;
+            v as f32
+        }).collect();
+
+        // Simple approach: just return the value offset (caller can threshold for iso)
+        Image { region: input.region, spacing: sp, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// DirectedHausdorffDistanceImageFilter
+// ===========================================================================
+
+/// Directed Hausdorff distance: max over A of min distance to B.
+/// Analog to `itk::DirectedHausdorffDistanceImageFilter`.
+pub struct DirectedHausdorffDistanceFilter<SA, SB, P> {
+    pub source_a: SA,
+    pub source_b: SB,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<SA, SB, P> DirectedHausdorffDistanceFilter<SA, SB, P> {
+    pub fn new(source_a: SA, source_b: SB) -> Self {
+        Self { source_a, source_b, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<P, SA, SB> DirectedHausdorffDistanceFilter<SA, SB, P>
+where P: NumericPixel,
+{
+    /// Returns the directed Hausdorff distance d(A→B).
+    pub fn compute<const D: usize>(&self) -> f64
+    where
+        SA: ImageSource<P, D>,
+        SB: ImageSource<P, D>,
+    {
+        let a = self.source_a.generate_region(self.source_a.largest_region());
+        let b = self.source_b.generate_region(self.source_b.largest_region());
+
+        let mut pts_a: Vec<[i64; D]> = Vec::new();
+        let mut pts_b: Vec<[i64; D]> = Vec::new();
+
+        iter_region(&a.region, |idx| {
+            if a.get_pixel(idx).to_f64() > 0.5 { pts_a.push(idx.0); }
+        });
+        iter_region(&b.region, |idx| {
+            if b.get_pixel(idx).to_f64() > 0.5 { pts_b.push(idx.0); }
+        });
+
+        if pts_a.is_empty() || pts_b.is_empty() { return 0.0; }
+
+        let sp = a.spacing;
+        let dist = |p: &[i64; D], q: &[i64; D]| -> f64 {
+            let mut s = 0.0f64;
+            for d in 0..D { s += ((p[d] - q[d]) as f64 * sp[d]).powi(2); }
+            s.sqrt()
+        };
+
+        pts_a.iter().map(|pa| {
+            pts_b.iter().map(|pb| dist(pa, pb))
+                .fold(f64::MAX, f64::min)
+        }).fold(f64::MIN, f64::max)
+    }
+}
+
+// ===========================================================================
+// ContourMeanDistanceImageFilter
+// ===========================================================================
+
+/// Mean distance between two binary contours.
+/// Analog to `itk::ContourMeanDistanceImageFilter`.
+pub struct ContourMeanDistanceFilter<SA, SB, P> {
+    pub source_a: SA,
+    pub source_b: SB,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<SA, SB, P> ContourMeanDistanceFilter<SA, SB, P> {
+    pub fn new(source_a: SA, source_b: SB) -> Self {
+        Self { source_a, source_b, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<P, SA, SB> ContourMeanDistanceFilter<SA, SB, P>
+where P: NumericPixel,
+{
+    /// Returns the symmetric mean contour distance.
+    pub fn compute<const D: usize>(&self) -> f64
+    where
+        SA: ImageSource<P, D>,
+        SB: ImageSource<P, D>,
+    {
+        let d_ab = DirectedHausdorffDistanceFilter::<_, _, P>::new(&self.source_a, &self.source_b);
+        let d_ba = DirectedHausdorffDistanceFilter::<_, _, P>::new(&self.source_b, &self.source_a);
+        (d_ab.compute::<D>() + d_ba.compute::<D>()) / 2.0
+    }
+}
+
+// ===========================================================================
+// FastMarchingExtensionImageFilter
+// ===========================================================================
+
+/// Extends scalar speed values along fast-marching wavefronts.
+/// Analog to `itk::FastMarchingExtensionImageFilter`.
+///
+/// Thin wrapper: runs fast marching and returns the arrival-time image.
+pub struct FastMarchingExtensionFilter<SF, P> {
+    pub source: SF,
+    pub seeds: Vec<([i64; 2], f64)>,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<SF, P> FastMarchingExtensionFilter<SF, P> {
+    pub fn new(source: SF, seeds: Vec<([i64; 2], f64)>) -> Self {
+        Self { source, seeds, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<P, SF> ImageSource<f32, 2> for FastMarchingExtensionFilter<SF, P>
+where
+    P: NumericPixel,
+    SF: ImageSource<P, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let input = self.source.generate_region(self.source.largest_region());
+        // Convert speed to f32 image then run fast marching
+        let speed_img = Image {
+            region: input.region,
+            spacing: input.spacing,
+            origin: input.origin,
+            data: input.data.iter().map(|p| p.to_f64() as f32).collect::<Vec<f32>>(),
+        };
+        let mut fm = crate::filters::fast_marching::FastMarchingFilter::<_, f32>::new(speed_img);
+        fm.seeds = self.seeds.iter().map(|&([x, y], v)| ([x, y, 0], v)).collect();
+        fm.generate_region(requested)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

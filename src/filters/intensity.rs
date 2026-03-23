@@ -1426,3 +1426,47 @@ mod tests {
         for &v in &out.data { assert!((v - (-1.0)).abs() < 1e-6); }
     }
 }
+
+// ===========================================================================
+// Complex pixel operations
+// ===========================================================================
+
+/// Complex pixel: `VecPixel<f32, 2>` where `[0]` = real, `[1]` = imaginary.
+
+/// Extract the real part of a complex image (`VecPixel<f32, 2>` → `f32`).
+/// Analog to `itk::ComplexToRealImageFilter`.
+pub fn complex_to_real<S, const D: usize>(
+    source: S,
+) -> super::UnaryFilter<S, impl Fn(VecPixel<f32, 2>) -> f32 + Sync + Send, VecPixel<f32, 2>, f32>
+{
+    super::UnaryFilter::new(source, |p: VecPixel<f32, 2>| p.0[0])
+}
+
+/// Extract the imaginary part of a complex image.
+/// Analog to `itk::ComplexToImaginaryImageFilter`.
+pub fn complex_to_imaginary<S, const D: usize>(
+    source: S,
+) -> super::UnaryFilter<S, impl Fn(VecPixel<f32, 2>) -> f32 + Sync + Send, VecPixel<f32, 2>, f32>
+{
+    super::UnaryFilter::new(source, |p: VecPixel<f32, 2>| p.0[1])
+}
+
+/// Compute modulus (magnitude) of a complex image.
+/// Analog to `itk::ComplexToModulusImageFilter`.
+pub fn complex_to_modulus<S, const D: usize>(
+    source: S,
+) -> super::UnaryFilter<S, impl Fn(VecPixel<f32, 2>) -> f32 + Sync + Send, VecPixel<f32, 2>, f32>
+{
+    super::UnaryFilter::new(source, |p: VecPixel<f32, 2>| {
+        (p.0[0] * p.0[0] + p.0[1] * p.0[1]).sqrt()
+    })
+}
+
+/// Compute phase (argument) of a complex image.
+/// Analog to `itk::ComplexToPhaseImageFilter`.
+pub fn complex_to_phase<S, const D: usize>(
+    source: S,
+) -> super::UnaryFilter<S, impl Fn(VecPixel<f32, 2>) -> f32 + Sync + Send, VecPixel<f32, 2>, f32>
+{
+    super::UnaryFilter::new(source, |p: VecPixel<f32, 2>| p.0[1].atan2(p.0[0]))
+}

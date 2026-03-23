@@ -508,6 +508,329 @@ where
 }
 
 // ===========================================================================
+// LabelStatisticsImageFilter
+// ===========================================================================
+
+/// Compute per-label statistics (min, max, mean, std).
+/// Analog to `itk::LabelStatisticsImageFilter`.
+pub struct LabelStatisticsResult {
+    pub label: u32,
+    pub count: usize,
+    pub min: f64,
+    pub max: f64,
+    pub mean: f64,
+    pub std: f64,
+    pub sum: f64,
+}
+
+pub struct LabelStatisticsFilter<SI, SL> {
+    pub intensity: SI,
+    pub label_map: SL,
+}
+
+impl<SI, SL> LabelStatisticsFilter<SI, SL> {
+    pub fn new(intensity: SI, label_map: SL) -> Self { Self { intensity, label_map } }
+}
+
+impl<SI, SL> LabelStatisticsFilter<SI, SL>
+{
+    /// Compute label statistics. Requires sources with compatible regions.
+    pub fn compute<P, const D: usize>(&self) -> Vec<LabelStatisticsResult>
+    where
+        P: crate::pixel::NumericPixel,
+        SI: crate::source::ImageSource<P, D>,
+        SL: crate::source::ImageSource<u32, D>,
+    {
+        use crate::image::iter_region;
+        use std::collections::HashMap;
+
+        let intensity = self.intensity.generate_region(self.intensity.largest_region());
+        let labels = self.label_map.generate_region(self.label_map.largest_region());
+
+        let mut stats: HashMap<u32, (usize, f64, f64, f64)> = HashMap::new(); // (count, sum, sum2, min, max)
+        let mut minmax: HashMap<u32, (f64, f64)> = HashMap::new();
+
+        iter_region(&intensity.region, |idx| {
+            let v = intensity.get_pixel(idx).to_f64();
+            let lbl = labels.get_pixel(idx);
+            let entry = stats.entry(lbl).or_insert((0, 0.0, 0.0, 0.0));
+            entry.0 += 1;
+            entry.1 += v;
+            entry.2 += v * v;
+            let mm = minmax.entry(lbl).or_insert((f64::MAX, f64::MIN));
+            if v < mm.0 { mm.0 = v; }
+            if v > mm.1 { mm.1 = v; }
+        });
+
+        let mut results: Vec<LabelStatisticsResult> = stats.iter().map(|(&label, &(count, sum, sum2, _))| {
+            let mean = sum / count as f64;
+            let var = (sum2 / count as f64 - mean * mean).max(0.0);
+            let (min, max) = minmax[&label];
+            LabelStatisticsResult { label, count, min, max, mean, std: var.sqrt(), sum }
+        }).collect();
+        results.sort_by_key(|r| r.label);
+        results
+    }
+}
+
+// ===========================================================================
+// ImageMomentsCalculator
+// ===========================================================================
+
+/// Compute spatial moments of an image (M00, M10, M01, centroid).
+/// Analog to `itk::ImageMomentsCalculator`.
+pub struct ImageMomentsCalculator<S> {
+    pub source: S,
+}
+
+impl<S> ImageMomentsCalculator<S> {
+    pub fn new(source: S) -> Self { Self { source } }
+}
+
+pub struct ImageMoments2D {
+    pub m00: f64,
+    pub centroid: [f64; 2],
+    pub central_moments: [[f64; 2]; 2],
+    pub principal_moments: [f64; 2],
+}
+
+impl<S> ImageMomentsCalculator<S>
+{
+    pub fn compute<P>(&self) -> ImageMoments2D
+    where
+        P: crate::pixel::NumericPixel,
+        S: crate::source::ImageSource<P, 2>,
+    {
+        use crate::image::iter_region;
+        let img = self.source.generate_region(self.source.largest_region());
+        let sp = img.spacing;
+
+        let mut m00 = 0.0f64;
+        let mut m10 = 0.0f64;
+        let mut m01 = 0.0f64;
+
+        iter_region(&img.region, |idx| {
+            let v = img.get_pixel(idx).to_f64();
+            let x = idx.0[0] as f64 * sp[0];
+            let y = idx.0[1] as f64 * sp[1];
+            m00 += v;
+            m10 += v * x;
+            m01 += v * y;
+        });
+
+        let cx = if m00 != 0.0 { m10 / m00 } else { 0.0 };
+        let cy = if m00 != 0.0 { m01 / m00 } else { 0.0 };
+
+        // Central moments
+        let mut mu20 = 0.0f64;
+        let mut mu02 = 0.0f64;
+        let mut mu11 = 0.0f64;
+        iter_region(&img.region, |idx| {
+            let v = img.get_pixel(idx).to_f64();
+            let x = idx.0[0] as f64 * sp[0] - cx;
+            let y = idx.0[1] as f64 * sp[1] - cy;
+            mu20 += v * x * x;
+            mu02 += v * y * y;
+            mu11 += v * x * y;
+        });
+        if m00 != 0.0 {
+            mu20 /= m00; mu02 /= m00; mu11 /= m00;
+        }
+
+        // Principal moments (eigenvalues of covariance)
+        let tr = mu20 + mu02;
+        let det = mu20 * mu02 - mu11 * mu11;
+        let disc = ((tr * tr / 4.0) - det).max(0.0).sqrt();
+        let l1 = tr / 2.0 - disc;
+        let l2 = tr / 2.0 + disc;
+
+        ImageMoments2D {
+            m00,
+            centroid: [cx, cy],
+            central_moments: [[mu20, mu11], [mu11, mu02]],
+            principal_moments: [l1, l2],
+        }
+    }
+}
+
+// ===========================================================================
+// LabelOverlapMeasuresImageFilter
+// ===========================================================================
+
+/// Per-label Dice/Jaccard/Sensitivity/Specificity overlap measures.
+/// Analog to `itk::LabelOverlapMeasuresImageFilter`.
+pub struct LabelOverlapMeasures {
+    pub label: u32,
+    pub dice: f64,
+    pub jaccard: f64,
+    pub sensitivity: f64,
+    pub specificity: f64,
+}
+
+pub struct LabelOverlapMeasuresFilter<SA, SB> {
+    pub source_a: SA,
+    pub source_b: SB,
+}
+
+impl<SA, SB> LabelOverlapMeasuresFilter<SA, SB> {
+    pub fn new(source_a: SA, source_b: SB) -> Self { Self { source_a, source_b } }
+}
+
+impl<SA, SB> LabelOverlapMeasuresFilter<SA, SB>
+{
+    pub fn compute<const D: usize>(&self) -> Vec<LabelOverlapMeasures>
+    where
+        SA: crate::source::ImageSource<u32, D>,
+        SB: crate::source::ImageSource<u32, D>,
+    {
+        use crate::image::iter_region;
+        use std::collections::{HashMap, HashSet};
+
+        let a = self.source_a.generate_region(self.source_a.largest_region());
+        let b = self.source_b.generate_region(self.source_b.largest_region());
+
+        // Collect all labels
+        let labels: HashSet<u32> = a.data.iter().chain(b.data.iter())
+            .filter(|&&l| l != 0)
+            .cloned().collect();
+
+        let mut results = Vec::new();
+        for &label in &labels {
+            let mut tp = 0usize; let mut fp = 0usize;
+            let mut fn_ = 0usize; let mut tn = 0usize;
+            iter_region(&a.region, |idx| {
+                let av = a.get_pixel(idx) == label;
+                let bv = b.get_pixel(idx) == label;
+                match (av, bv) {
+                    (true, true) => tp += 1,
+                    (false, true) => fp += 1,
+                    (true, false) => fn_ += 1,
+                    (false, false) => tn += 1,
+                }
+            });
+            let dice = if tp + fp + fn_ > 0 { 2.0 * tp as f64 / (2 * tp + fp + fn_) as f64 } else { 1.0 };
+            let jaccard = if tp + fp + fn_ > 0 { tp as f64 / (tp + fp + fn_) as f64 } else { 1.0 };
+            let sensitivity = if tp + fn_ > 0 { tp as f64 / (tp + fn_) as f64 } else { 1.0 };
+            let specificity = if tn + fp > 0 { tn as f64 / (tn + fp) as f64 } else { 1.0 };
+            results.push(LabelOverlapMeasures { label, dice, jaccard, sensitivity, specificity });
+        }
+        results.sort_by_key(|r| r.label);
+        results
+    }
+}
+
+// ===========================================================================
+// STAPLEImageFilter
+// ===========================================================================
+
+/// STAPLE (Simultaneous Truth and Performance Level Estimation) consensus.
+/// Analog to `itk::STAPLEImageFilter`.
+/// Produces a probability image from multiple binary label images.
+pub struct STAPLEFilter {
+    pub sources: Vec<crate::image::Image<u32, 2>>,
+    pub iterations: usize,
+}
+
+impl STAPLEFilter {
+    pub fn new(sources: Vec<crate::image::Image<u32, 2>>) -> Self {
+        Self { sources, iterations: 20 }
+    }
+
+    pub fn compute(&self) -> crate::image::Image<f32, 2> {
+        if self.sources.is_empty() {
+            return crate::image::Image { region: crate::image::Region::new([0,0],[0,0]), spacing: [1.0;2], origin: [0.0;2], data: vec![] };
+        }
+        let region = self.sources[0].region;
+        let n_pix = region.linear_len();
+        let n_raters = self.sources.len();
+
+        // Initialize W (probability of true positive) to fraction of raters agreeing
+        let mut w: Vec<f64> = (0..n_pix).map(|i| {
+            let votes: usize = self.sources.iter().map(|s| if s.data[i] != 0 { 1 } else { 0 }).sum();
+            votes as f64 / n_raters as f64
+        }).collect();
+
+        // EM iterations
+        let mut p = vec![0.99f64; n_raters]; // sensitivity
+        let mut q = vec![0.99f64; n_raters]; // specificity
+
+        for _ in 0..self.iterations {
+            // E-step: compute posterior W given current p, q
+            let mut new_w: Vec<f64> = vec![0.0; n_pix];
+            for i in 0..n_pix {
+                let mut num = w[i];
+                let mut den = w[i];
+                for r in 0..n_raters {
+                    let d = (self.sources[r].data[i] != 0) as usize;
+                    num *= if d == 1 { p[r] } else { 1.0 - p[r] };
+                    den *= if d == 1 { p[r] } else { 1.0 - p[r] };
+                }
+                let mut neg = 1.0 - w[i];
+                for r in 0..n_raters {
+                    let d = (self.sources[r].data[i] != 0) as usize;
+                    neg *= if d == 0 { q[r] } else { 1.0 - q[r] };
+                }
+                new_w[i] = num / (num + neg).max(1e-12);
+            }
+            w = new_w;
+
+            // M-step: update p and q
+            for r in 0..n_raters {
+                let mut sum_w = 0.0f64;
+                let mut sum_wd = 0.0f64;
+                let mut sum_1mw = 0.0f64;
+                let mut sum_1mwd = 0.0f64;
+                for i in 0..n_pix {
+                    let d = if self.sources[r].data[i] != 0 { 1.0f64 } else { 0.0f64 };
+                    sum_w += w[i];
+                    sum_wd += w[i] * d;
+                    sum_1mw += 1.0 - w[i];
+                    sum_1mwd += (1.0 - w[i]) * d;
+                }
+                p[r] = (sum_wd / sum_w.max(1e-12)).clamp(1e-6, 1.0 - 1e-6);
+                q[r] = (1.0 - sum_1mwd / sum_1mw.max(1e-12)).clamp(1e-6, 1.0 - 1e-6);
+            }
+        }
+
+        let data: Vec<f32> = w.iter().map(|&v| v as f32).collect();
+        crate::image::Image { region, spacing: self.sources[0].spacing, origin: self.sources[0].origin, data }
+    }
+}
+
+// ===========================================================================
+// MultiLabelSTAPLEImageFilter
+// ===========================================================================
+
+/// Multi-label STAPLE: majority vote fusion over multiple label images.
+/// Analog to `itk::MultiLabelSTAPLEImageFilter`.
+pub struct MultiLabelSTAPLEFilter {
+    pub sources: Vec<crate::image::Image<u32, 2>>,
+}
+
+impl MultiLabelSTAPLEFilter {
+    pub fn new(sources: Vec<crate::image::Image<u32, 2>>) -> Self { Self { sources } }
+
+    pub fn compute(&self) -> crate::image::Image<u32, 2> {
+        if self.sources.is_empty() {
+            return crate::image::Image { region: crate::image::Region::new([0,0],[0,0]), spacing: [1.0;2], origin: [0.0;2], data: vec![] };
+        }
+        let region = self.sources[0].region;
+        let n_pix = region.linear_len();
+        use std::collections::HashMap;
+
+        let data: Vec<u32> = (0..n_pix).map(|i| {
+            let mut votes: HashMap<u32, usize> = HashMap::new();
+            for s in &self.sources {
+                *votes.entry(s.data[i]).or_insert(0) += 1;
+            }
+            votes.into_iter().max_by_key(|&(_, c)| c).map(|(l, _)| l).unwrap_or(0)
+        }).collect();
+
+        crate::image::Image { region, spacing: self.sources[0].spacing, origin: self.sources[0].origin, data }
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

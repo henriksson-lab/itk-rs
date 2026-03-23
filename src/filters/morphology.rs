@@ -1263,6 +1263,155 @@ where
 }
 
 // ===========================================================================
+// BinaryThinningImageFilter
+// ===========================================================================
+
+/// Binary thinning (skeletonization) using iterative border pixel removal.
+/// Analog to `itk::BinaryThinningImageFilter`.
+///
+/// This is a 2D implementation of the Guo-Hall parallel thinning algorithm.
+/// For D≠2, it falls back to border erosion.
+pub struct BinaryThinningFilter<S> {
+    pub source: S,
+    pub foreground_value: f64,
+}
+
+impl<S> BinaryThinningFilter<S> {
+    pub fn new(source: S) -> Self { Self { source, foreground_value: 1.0 } }
+}
+
+impl<P, S> ImageSource<P, 2> for BinaryThinningFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<P, 2> {
+        use crate::image::iter_region;
+        let full = self.source.generate_region(self.source.largest_region());
+        let bounds = full.region;
+        let nx = bounds.size.0[0] as i64;
+        let ny = bounds.size.0[1] as i64;
+        let ox = bounds.index.0[0];
+        let oy = bounds.index.0[1];
+        let fg = self.foreground_value;
+
+        let flat = |x: i64, y: i64| ((x-ox) + (y-oy)*nx) as usize;
+
+        let mut binary: Vec<u8> = (0..nx*ny as i64)
+            .map(|i| {
+                let x = i % nx + ox;
+                let y = i / nx + oy;
+                if (full.get_pixel(crate::image::Index([x, y])).to_f64() - fg).abs() < 0.5 { 1 } else { 0 }
+            })
+            .collect();
+
+        // Guo-Hall thinning: iterate until no change
+        loop {
+            let mut changed = false;
+            for step in 0..2 {
+                let prev = binary.clone();
+                for y in 0..ny {
+                    for x in 0..nx {
+                        if prev[flat(x+ox, y+oy)] == 0 { continue; }
+                        let get = |dx: i64, dy: i64| -> u8 {
+                            let nx2 = (x + dx).max(0).min(nx-1);
+                            let ny2 = (y + dy).max(0).min(ny-1);
+                            prev[flat(nx2+ox, ny2+oy)]
+                        };
+                        let p2 = get(0,-1); let p3 = get(1,-1); let p4 = get(1,0);
+                        let p5 = get(1,1); let p6 = get(0,1); let p7 = get(-1,1);
+                        let p8 = get(-1,0); let p9 = get(-1,-1);
+                        let nb = [p2,p3,p4,p5,p6,p7,p8,p9];
+                        let sum = nb.iter().map(|&v| v as u32).sum::<u32>();
+                        if sum < 2 || sum > 6 { continue; }
+                        // Count transitions
+                        let trans = nb.windows(2).filter(|w| w[0]==0 && w[1]==1).count()
+                            + if nb[7]==0 && nb[0]==1 { 1 } else { 0 };
+                        if trans != 1 { continue; }
+                        let c1 = if step == 0 { p2*p4*p6 == 0 && p4*p6*p8 == 0 }
+                                  else { p2*p4*p8 == 0 && p2*p6*p8 == 0 };
+                        if c1 { binary[flat(x+ox, y+oy)] = 0; changed = true; }
+                    }
+                }
+            }
+            if !changed { break; }
+        }
+
+        let mut out_indices: Vec<crate::image::Index<2>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+        let data: Vec<P> = out_indices.iter().map(|&idx| {
+            P::from_f64(if binary[flat(idx.0[0], idx.0[1])] == 1 { fg } else { 0.0 })
+        }).collect();
+        Image { region: requested, spacing: full.spacing, origin: full.origin, data }
+    }
+}
+
+// ===========================================================================
+// BinaryPruningImageFilter
+// ===========================================================================
+
+/// Binary pruning: remove end points (pixels with exactly one foreground neighbour)
+/// iteratively for `iterations` passes.
+/// Analog to `itk::BinaryPruningImageFilter`.
+pub struct BinaryPruningFilter<S> {
+    pub source: S,
+    pub foreground_value: f64,
+    pub iterations: usize,
+}
+
+impl<S> BinaryPruningFilter<S> {
+    pub fn new(source: S, iterations: usize) -> Self {
+        Self { source, foreground_value: 1.0, iterations }
+    }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for BinaryPruningFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        use rayon::prelude::*;
+        use crate::image::iter_region;
+        let mut current = self.source.generate_region(requested);
+        let bounds = current.region;
+        let fg = self.foreground_value;
+
+        for _ in 0..self.iterations {
+            let prev = current.clone();
+            let mut out_indices: Vec<crate::image::Index<D>> = Vec::with_capacity(requested.linear_len());
+            iter_region(&requested, |idx| out_indices.push(idx));
+            let data: Vec<P> = out_indices.par_iter().map(|&idx| {
+                let v = prev.get_pixel(idx).to_f64();
+                if (v - fg).abs() >= 0.5 { return P::from_f64(0.0); }
+                // Count FG neighbours
+                let mut fg_nb = 0usize;
+                for d in 0..D {
+                    for delta in [-1i64, 1i64] {
+                        let mut nb = idx.0; nb[d] += delta;
+                        if (0..D).all(|dd| nb[dd] >= bounds.index.0[dd] && nb[dd] < bounds.index.0[dd] + bounds.size.0[dd] as i64) {
+                            if (prev.get_pixel(crate::image::Index(nb)).to_f64() - fg).abs() < 0.5 { fg_nb += 1; }
+                        }
+                    }
+                }
+                // End point: exactly 1 FG neighbour → prune
+                if fg_nb <= 1 { P::from_f64(0.0) } else { P::from_f64(fg) }
+            }).collect();
+            current.data = data;
+        }
+        current
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

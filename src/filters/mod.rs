@@ -21,6 +21,10 @@ pub mod curvature_flow;
 pub mod segmentation;
 pub mod colormap;
 pub mod label_map;
+pub mod displacement;
+pub mod registration;
+pub mod fft;
+pub mod deconvolution;
 
 use std::marker::PhantomData;
 

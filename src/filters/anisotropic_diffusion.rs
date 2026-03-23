@@ -365,6 +365,191 @@ fn run_curvature_diffusion_generic<const D: usize>(
     run_curvature_diffusion_2d(u, region2, spacing2, iterations, conductance, dt)
 }
 
+// ===========================================================================
+// VectorGradientAnisotropicDiffusionFilter
+// ===========================================================================
+
+/// Gradient anisotropic diffusion for vector-valued images.
+/// Analog to `itk::VectorGradientAnisotropicDiffusionImageFilter`.
+///
+/// Applies gradient anisotropic diffusion independently to each vector component.
+pub struct VectorGradientAnisotropicDiffusionFilter<S, const N: usize> {
+    pub source: S,
+    pub time_step: f64,
+    pub conductance: f64,
+    pub iterations: usize,
+}
+
+impl<S, const N: usize> VectorGradientAnisotropicDiffusionFilter<S, N> {
+    pub fn new(source: S, time_step: f64, conductance: f64, iterations: usize) -> Self {
+        Self { source, time_step, conductance, iterations }
+    }
+}
+
+impl<S, const N: usize, const D: usize> crate::source::ImageSource<crate::pixel::VecPixel<f32, N>, D>
+    for VectorGradientAnisotropicDiffusionFilter<S, N>
+where
+    S: crate::source::ImageSource<crate::pixel::VecPixel<f32, N>, D> + Sync,
+{
+    fn largest_region(&self) -> crate::image::Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: crate::image::Region<D>) -> crate::image::Image<crate::pixel::VecPixel<f32, N>, D> {
+        use crate::pixel::{NumericPixel, VecPixel};
+        use crate::image::{Image, Region, iter_region};
+
+        let full = self.source.generate_region(self.source.largest_region());
+        let bounds = full.region;
+        let n_pix = bounds.linear_len();
+
+        // Process each channel independently
+        let mut channels: Vec<Vec<f64>> = (0..N).map(|c| {
+            full.data.iter().map(|p| p.0[c] as f64).collect()
+        }).collect();
+
+        let flat = |idx: [i64; D]| -> usize {
+            let mut f = 0usize; let mut stride = 1usize;
+            for d in 0..D { f += (idx[d] - bounds.index.0[d]) as usize * stride; stride *= bounds.size.0[d]; }
+            f
+        };
+        let clamp = |v: i64, d: usize| -> i64 {
+            v.max(bounds.index.0[d]).min(bounds.index.0[d] + bounds.size.0[d] as i64 - 1)
+        };
+
+        let dt = self.time_step;
+        let k = self.conductance;
+
+        for _ in 0..self.iterations {
+            for c in 0..N {
+                let prev = channels[c].clone();
+                let mut idxs: Vec<[i64; D]> = Vec::with_capacity(n_pix);
+                iter_region(&bounds, |idx| idxs.push(idx.0));
+
+                let new_vals: Vec<f64> = idxs.iter().map(|&idx| {
+                    let v = prev[flat(idx)];
+                    let mut flux = 0.0f64;
+                    for d in 0..D {
+                        let mut fwd_idx = idx; fwd_idx[d] = clamp(idx[d] + 1, d);
+                        let mut bwd_idx = idx; bwd_idx[d] = clamp(idx[d] - 1, d);
+                        let grad_fwd = prev[flat(fwd_idx)] - v;
+                        let grad_bwd = v - prev[flat(bwd_idx)];
+                        let c_fwd = (-grad_fwd.abs() / k).exp();
+                        let c_bwd = (-grad_bwd.abs() / k).exp();
+                        flux += c_fwd * grad_fwd - c_bwd * grad_bwd;
+                    }
+                    v + dt * flux
+                }).collect();
+                channels[c] = new_vals;
+            }
+        }
+
+        let mut out_indices: Vec<crate::image::Index<D>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+
+        let data: Vec<VecPixel<f32, N>> = out_indices.iter().map(|&idx| {
+            let f = flat(idx.0);
+            let mut arr = [0.0f32; N];
+            for c in 0..N { arr[c] = channels[c][f] as f32; }
+            VecPixel(arr)
+        }).collect();
+
+        Image { region: requested, spacing: full.spacing, origin: full.origin, data }
+    }
+}
+
+// ===========================================================================
+// VectorCurvatureAnisotropicDiffusionFilter
+// ===========================================================================
+
+/// Curvature anisotropic diffusion for vector-valued images.
+/// Analog to `itk::VectorCurvatureAnisotropicDiffusionImageFilter`.
+///
+/// Applies 2-D curvature anisotropic diffusion independently to each vector component.
+pub struct VectorCurvatureAnisotropicDiffusionFilter<S, const N: usize> {
+    pub source: S,
+    pub iterations: usize,
+    pub conductance: f64,
+    pub time_step: f64,
+}
+
+impl<S, const N: usize> VectorCurvatureAnisotropicDiffusionFilter<S, N> {
+    pub fn new(source: S, iterations: usize, conductance: f64) -> Self {
+        Self { source, iterations, conductance, time_step: 0.125 }
+    }
+}
+
+impl<S, const N: usize> crate::source::ImageSource<crate::pixel::VecPixel<f32, N>, 2>
+    for VectorCurvatureAnisotropicDiffusionFilter<S, N>
+where
+    S: crate::source::ImageSource<crate::pixel::VecPixel<f32, N>, 2> + Sync,
+{
+    fn largest_region(&self) -> crate::image::Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: crate::image::Region<2>) -> crate::image::Image<crate::pixel::VecPixel<f32, N>, 2> {
+        use crate::pixel::VecPixel;
+        let full = self.source.generate_region(self.source.largest_region());
+        let region = full.region;
+        let [w, h] = [region.size.0[0], region.size.0[1]];
+        let [ox, oy] = [region.index.0[0], region.index.0[1]];
+
+        let flat = |idx: [i64; 2]| -> usize {
+            let xi = (idx[0] - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (idx[1] - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        // Extract per-channel f64 slices
+        let mut channels: Vec<Vec<f64>> = (0..N).map(|c| {
+            full.data.iter().map(|p| p.0[c] as f64).collect()
+        }).collect();
+
+        let dt = self.time_step;
+        let k = self.conductance;
+
+        for _ in 0..self.iterations {
+            for c in 0..N {
+                let u = &channels[c];
+                let new_vals: Vec<f64> = (0..h).flat_map(|y| {
+                    (0..w).map(move |x| {
+                        let i = y * w + x;
+                        let xi = ox + x as i64;
+                        let yi = oy + y as i64;
+
+                        // cardinal neighbors
+                        let xp = flat([xi + 1, yi]);
+                        let xm = flat([xi - 1, yi]);
+                        let yp = flat([xi, yi + 1]);
+                        let ym = flat([xi, yi - 1]);
+
+                        let c_u = u[i];
+                        let ux = (u[xp] - u[xm]) * 0.5;
+                        let uy = (u[yp] - u[ym]) * 0.5;
+                        let grad2 = ux * ux + uy * uy;
+                        let g = (-(grad2) / (k * k)).exp();
+
+                        // Laplacian term
+                        let laplacian = u[xp] + u[xm] + u[yp] + u[ym] - 4.0 * c_u;
+                        c_u + dt * g * laplacian
+                    })
+                }).collect();
+                channels[c] = new_vals;
+            }
+        }
+
+        let n_pix = w * h;
+        let data: Vec<VecPixel<f32, N>> = (0..n_pix).map(|i| {
+            let mut arr = [0.0f32; N];
+            for c in 0..N { arr[c] = channels[c][i] as f32; }
+            VecPixel(arr)
+        }).collect();
+
+        crate::image::Image { region: full.region, spacing: full.spacing, origin: full.origin, data }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ description = "A Rust translation of ITK (Insight Segmentation and Registration 
 [dependencies]
 rayon = "1.10"
 png = "0.17"
+rand = "0.8"
 
 [dev-dependencies]
 approx = "0.5"
