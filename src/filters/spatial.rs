@@ -1120,6 +1120,413 @@ where
 }
 
 // ===========================================================================
+// BSplineDownsampleImageFilter
+// ===========================================================================
+
+/// Downsample by 2 using BSpline prefiltering then subsampling.
+/// Analog to `itk::BSplineDownsampleImageFilter`.
+pub struct BSplineDownsampleFilter<S, P> {
+    pub source: S,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<S, P> BSplineDownsampleFilter<S, P> {
+    pub fn new(source: S) -> Self { Self { source, _phantom: std::marker::PhantomData } }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for BSplineDownsampleFilter<S, P>
+where
+    P: crate::pixel::NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> {
+        let r = self.source.largest_region();
+        let mut size = r.size.0;
+        for d in 0..D { size[d] = (size[d] + 1) / 2; }
+        Region::new(r.index.0, size)
+    }
+    fn spacing(&self) -> [f64; D] {
+        let mut sp = self.source.spacing();
+        for d in 0..D { sp[d] *= 2.0; }
+        sp
+    }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, _requested: Region<D>) -> Image<P, D> {
+        // Apply Gaussian smoothing then subsample by 2
+        let smooth = crate::filters::gaussian::GaussianFilter { source: &self.source, sigma: 1.0 };
+        let smoothed = smooth.generate_region(self.source.largest_region());
+        let out_region = self.largest_region();
+        let mut out = Image::allocate(out_region, self.spacing(), self.origin(), P::zero());
+        iter_region(&out_region, |idx| {
+            let mut src_idx = idx.0;
+            for d in 0..D { src_idx[d] = smoothed.region.index.0[d] + (idx.0[d] - out_region.index.0[d]) * 2; }
+            let v = smoothed.get_pixel(Index(src_idx));
+            out.set_pixel(idx, v);
+        });
+        out
+    }
+}
+
+// ===========================================================================
+// BSplineUpsampleImageFilter
+// ===========================================================================
+
+/// Upsample by 2 using BSpline interpolation.
+/// Analog to `itk::BSplineUpsampleImageFilter`.
+pub struct BSplineUpsampleFilter<S, P> {
+    pub source: S,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<S, P> BSplineUpsampleFilter<S, P> {
+    pub fn new(source: S) -> Self { Self { source, _phantom: std::marker::PhantomData } }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for BSplineUpsampleFilter<S, P>
+where
+    P: crate::pixel::NumericPixel,
+    S: ImageSource<P, D>,
+{
+    fn largest_region(&self) -> Region<D> {
+        let r = self.source.largest_region();
+        let mut size = r.size.0;
+        for d in 0..D { size[d] *= 2; }
+        Region::new(r.index.0, size)
+    }
+    fn spacing(&self) -> [f64; D] {
+        let mut sp = self.source.spacing();
+        for d in 0..D { sp[d] /= 2.0; }
+        sp
+    }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, _requested: Region<D>) -> Image<P, D> {
+        let input = self.source.generate_region(self.source.largest_region());
+        let out_region = self.largest_region();
+        let mut out = Image::allocate(out_region, self.spacing(), self.origin(), P::zero());
+        iter_region(&out_region, |idx| {
+            // Bilinear/nearest interpolation at half-pixel positions
+            let mut src_idx = idx.0;
+            for d in 0..D {
+                src_idx[d] = input.region.index.0[d] + (idx.0[d] - out_region.index.0[d]) / 2;
+                src_idx[d] = src_idx[d].clamp(input.region.index.0[d], input.region.index.0[d] + input.region.size.0[d] as i64 - 1);
+            }
+            out.set_pixel(idx, input.get_pixel(Index(src_idx)));
+        });
+        out
+    }
+}
+
+// ===========================================================================
+// OrientImageFilter
+// ===========================================================================
+
+/// Reorient image axes to a target orientation.
+/// Analog to `itk::OrientImageFilter`.
+///
+/// This simplified version supports axis permutation and flipping.
+pub struct OrientImageFilter<S> {
+    pub source: S,
+    /// Permutation of axes: permutation[d] = source axis for output axis d
+    pub axis_permutation: [usize; 2],
+    /// Flip along each axis
+    pub flip: [bool; 2],
+}
+
+impl<S> OrientImageFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, axis_permutation: [0, 1], flip: [false, false] }
+    }
+}
+
+impl<P, S> ImageSource<P, 2> for OrientImageFilter<S>
+where
+    P: crate::pixel::Pixel,
+    S: ImageSource<P, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<P, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+        let mut out = input.clone();
+
+        iter_region(&input.region, |idx| {
+            let [x, y] = [idx.0[0] - ox, idx.0[1] - oy];
+            let src_axes = [x, y];
+            let px = [self.axis_permutation[0], self.axis_permutation[1]];
+            let sx = src_axes[px[0]];
+            let sy = src_axes[px[1]];
+            let fx = if self.flip[0] { input.region.size.0[px[0]] as i64 - 1 - sx } else { sx };
+            let fy = if self.flip[1] { input.region.size.0[px[1]] as i64 - 1 - sy } else { sy };
+            let src_idx = Index([ox + fx, oy + fy]);
+            if input.region.contains(&src_idx) {
+                out.set_pixel(idx, input.get_pixel(src_idx));
+            }
+        });
+        out
+    }
+}
+
+// ===========================================================================
+// SliceBySliceImageFilter
+// ===========================================================================
+
+/// Apply a 2D filter slice-by-slice to a 3D image.
+/// Analog to `itk::SliceBySliceImageFilter`.
+///
+/// Since this crate uses const generics for D, this adapter wraps D=3 images
+/// and processes each (x,y) slice along axis 2.
+pub struct SliceBySliceFilter<S, P> {
+    pub source: S,
+    /// Sigma for Gaussian smoothing applied to each slice.
+    pub sigma: f64,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<S, P> SliceBySliceFilter<S, P> {
+    pub fn new(source: S, sigma: f64) -> Self { Self { source, sigma, _phantom: std::marker::PhantomData } }
+}
+
+impl<P, S> ImageSource<P, 3> for SliceBySliceFilter<S, P>
+where
+    P: crate::pixel::NumericPixel,
+    S: ImageSource<P, 3>,
+{
+    fn largest_region(&self) -> Region<3> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 3] { self.source.spacing() }
+    fn origin(&self) -> [f64; 3] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<3>) -> Image<P, 3> {
+        let input = self.source.generate_region(requested);
+        let [w, h, d] = [input.region.size.0[0], input.region.size.0[1], input.region.size.0[2]];
+        let [ox, oy, oz] = [input.region.index.0[0], input.region.index.0[1], input.region.index.0[2]];
+        let sp2 = [input.spacing[0], input.spacing[1]];
+        let origin2 = [input.origin[0], input.origin[1]];
+        let in_region = input.region;
+        let in_spacing = input.spacing;
+        let in_origin = input.origin;
+
+        let mut out_data: Vec<P> = input.data.clone();
+
+        for z in 0..d {
+            // Extract 2D slice
+            let slice_region = Region::new([ox, oy], [w, h]);
+            let slice_data: Vec<P> = (0..h * w).map(|i| {
+                let y = i / w; let x = i % w;
+                input.get_pixel(Index([ox + x as i64, oy + y as i64, oz + z as i64]))
+            }).collect();
+            let slice_img = Image { region: slice_region, spacing: sp2, origin: origin2, data: slice_data };
+
+            // Apply Gaussian smoothing to slice
+            let smoothed = crate::filters::gaussian::GaussianFilter { source: slice_img, sigma: self.sigma };
+            let out_slice = smoothed.generate_region(smoothed.largest_region());
+
+            // Write back
+            for y in 0..h {
+                for x in 0..w {
+                    let v = out_slice.get_pixel(Index([ox + x as i64, oy + y as i64]));
+                    let i = z * h * w + y * w + x;
+                    out_data[i] = v;
+                }
+            }
+        }
+
+        Image { region: in_region, spacing: in_spacing, origin: in_origin, data: out_data }
+    }
+}
+
+// ===========================================================================
+// InterpolateImageFilter
+// ===========================================================================
+
+/// Interpolate between two images.
+/// Analog to `itk::InterpolateImageFilter`.
+///
+/// Output = (1-t) * A + t * B.
+pub struct InterpolateImageFilter<SA, SB> {
+    pub source_a: SA,
+    pub source_b: SB,
+    pub t: f64,
+}
+
+impl<SA, SB> InterpolateImageFilter<SA, SB> {
+    pub fn new(source_a: SA, source_b: SB, t: f64) -> Self {
+        Self { source_a, source_b, t }
+    }
+}
+
+impl<SA, SB, const D: usize> ImageSource<f32, D> for InterpolateImageFilter<SA, SB>
+where
+    SA: ImageSource<f32, D>,
+    SB: ImageSource<f32, D>,
+{
+    fn largest_region(&self) -> Region<D> { self.source_a.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source_a.spacing() }
+    fn origin(&self) -> [f64; D] { self.source_a.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<f32, D> {
+        let a = self.source_a.generate_region(requested);
+        let b = self.source_b.generate_region(requested);
+        let t = self.t as f32;
+        let data: Vec<f32> = a.data.iter().zip(b.data.iter())
+            .map(|(&av, &bv)| av * (1.0 - t) + bv * t)
+            .collect();
+        Image { region: a.region, spacing: a.spacing, origin: a.origin, data }
+    }
+}
+
+// ===========================================================================
+// BSplineScatteredDataPointSetToImageFilter
+// ===========================================================================
+
+/// Fit a BSpline surface to scattered point data.
+/// Analog to `itk::BSplineScatteredDataPointSetToImageFilter`.
+pub struct BSplineScatteredDataFilter {
+    pub points: Vec<([f64; 2], f64)>,
+    pub region: Region<2>,
+    pub spacing: [f64; 2],
+    pub order: usize,
+}
+
+impl BSplineScatteredDataFilter {
+    pub fn new(points: Vec<([f64; 2], f64)>, region: Region<2>) -> Self {
+        Self { points, region, spacing: [1.0; 2], order: 3 }
+    }
+
+    pub fn compute(&self) -> Image<f32, 2> {
+        // Scatter data to grid using inverse distance weighting as approximation
+        let [w, h] = [self.region.size.0[0], self.region.size.0[1]];
+        let [ox, oy] = [self.region.index.0[0], self.region.index.0[1]];
+        let mut weights = vec![0.0f64; w * h];
+        let mut values = vec![0.0f64; w * h];
+
+        for y in 0..h {
+            for x in 0..w {
+                let px = ox as f64 + x as f64 * self.spacing[0];
+                let py = oy as f64 + y as f64 * self.spacing[1];
+                let mut w_sum = 0.0f64;
+                let mut v_sum = 0.0f64;
+                for &([qx, qy], v) in &self.points {
+                    let d2 = (px - qx).powi(2) + (py - qy).powi(2);
+                    let w = if d2 < 1e-10 { 1e10 } else { 1.0 / d2 };
+                    w_sum += w;
+                    v_sum += w * v;
+                }
+                let i = y * w + x;
+                if w_sum > 0.0 { values[i] = v_sum / w_sum; }
+                weights[i] = w_sum;
+            }
+        }
+
+        let data: Vec<f32> = values.iter().map(|&v| v as f32).collect();
+        Image { region: self.region, spacing: self.spacing, origin: [0.0; 2], data }
+    }
+}
+
+// ===========================================================================
+// LandmarkDisplacementFieldSource
+// ===========================================================================
+
+/// Generate a displacement field from landmark correspondences.
+/// Analog to `itk::LandmarkDisplacementFieldSource`.
+pub struct LandmarkDisplacementFieldSource {
+    pub source_landmarks: Vec<[f64; 2]>,
+    pub target_landmarks: Vec<[f64; 2]>,
+    pub region: Region<2>,
+    pub spacing: [f64; 2],
+}
+
+impl LandmarkDisplacementFieldSource {
+    pub fn new(source: Vec<[f64; 2]>, target: Vec<[f64; 2]>, region: Region<2>) -> Self {
+        Self { source_landmarks: source, target_landmarks: target, region, spacing: [1.0; 2] }
+    }
+
+    pub fn compute(&self) -> Image<crate::pixel::VecPixel<f32, 2>, 2> {
+        use crate::pixel::VecPixel;
+        let [w, h] = [self.region.size.0[0], self.region.size.0[1]];
+        let [ox, oy] = [self.region.index.0[0], self.region.index.0[1]];
+
+        let data: Vec<VecPixel<f32, 2>> = (0..h).flat_map(|y| {
+            (0..w).map(move |x| {
+                let px = ox as f64 + x as f64 * self.spacing[0];
+                let py = oy as f64 + y as f64 * self.spacing[1];
+                // Inverse distance weighted interpolation of displacements
+                let mut w_sum = 0.0f64;
+                let mut dx_sum = 0.0f64;
+                let mut dy_sum = 0.0f64;
+                for i in 0..self.source_landmarks.len().min(self.target_landmarks.len()) {
+                    let [sx, sy] = self.source_landmarks[i];
+                    let [tx, ty] = self.target_landmarks[i];
+                    let d2 = (px - sx).powi(2) + (py - sy).powi(2);
+                    let w = if d2 < 1e-10 { 1e10 } else { 1.0 / d2 };
+                    w_sum += w;
+                    dx_sum += w * (tx - sx);
+                    dy_sum += w * (ty - sy);
+                }
+                if w_sum > 0.0 {
+                    VecPixel([(dx_sum / w_sum) as f32, (dy_sum / w_sum) as f32])
+                } else {
+                    VecPixel([0.0, 0.0])
+                }
+            })
+        }).collect();
+
+        Image { region: self.region, spacing: self.spacing, origin: [0.0; 2], data }
+    }
+}
+
+// ===========================================================================
+// DisplacementFieldToBSplineFilter
+// ===========================================================================
+
+/// Fit a BSpline to a displacement field.
+/// Analog to `itk::DisplacementFieldToBSplineImageFilter`.
+pub struct DisplacementFieldToBSplineFilter<S> {
+    pub source: S,
+    pub sigma: f64,
+}
+
+impl<S> DisplacementFieldToBSplineFilter<S> {
+    pub fn new(source: S) -> Self { Self { source, sigma: 2.0 } }
+}
+
+impl<S> ImageSource<crate::pixel::VecPixel<f32, 2>, 2> for DisplacementFieldToBSplineFilter<S>
+where
+    S: ImageSource<crate::pixel::VecPixel<f32, 2>, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<crate::pixel::VecPixel<f32, 2>, 2> {
+        // Apply Gaussian smoothing as a BSpline approximation
+        use crate::pixel::VecPixel;
+        let input = self.source.generate_region(requested);
+        let dx = Image {
+            region: input.region, spacing: input.spacing, origin: input.origin,
+            data: input.data.iter().map(|p| p.0[0]).collect(),
+        };
+        let dy = Image {
+            region: input.region, spacing: input.spacing, origin: input.origin,
+            data: input.data.iter().map(|p| p.0[1]).collect(),
+        };
+        let sx = crate::filters::gaussian::GaussianFilter { source: dx, sigma: self.sigma };
+        let sy = crate::filters::gaussian::GaussianFilter { source: dy, sigma: self.sigma };
+        let sdx = sx.generate_region(sx.largest_region());
+        let sdy = sy.generate_region(sy.largest_region());
+        let data: Vec<VecPixel<f32, 2>> = sdx.data.iter().zip(sdy.data.iter())
+            .map(|(&x, &y)| VecPixel([x, y]))
+            .collect();
+        Image { region: sdx.region, spacing: sdx.spacing, origin: sdx.origin, data }
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

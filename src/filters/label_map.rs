@@ -523,14 +523,16 @@ impl<S> BinaryImageToShapeLabelMapFilter<S> {
     pub fn new(source: S) -> Self { Self { source } }
 }
 
-impl<P, S> BinaryImageToShapeLabelMapFilter<S>
-where
-    P: crate::pixel::NumericPixel,
-    S: crate::source::ImageSource<P, 2>,
+impl<S> BinaryImageToShapeLabelMapFilter<S>
 {
-    pub fn compute(&self) -> Vec<ShapeAttributes> {
+    pub fn compute<P>(&self) -> Vec<ShapeAttributes>
+    where
+        P: crate::pixel::NumericPixel,
+        S: crate::source::ImageSource<P, 2> + Sync,
+    {
         // Run connected components on binary image then shape analysis
-        let cc = crate::filters::segmentation::ConnectedComponentFilter::<_, P>::new(&self.source);
+        let input = self.source.generate_region(self.source.largest_region());
+        let cc = crate::filters::segmentation::ConnectedComponentFilter::<_, P>::new(input);
         let label_img = cc.generate_region(cc.largest_region());
         let shape = ShapeLabelMapFilter::new(label_img);
         shape.compute()
@@ -547,14 +549,16 @@ impl<SI, SL> BinaryImageToStatisticsLabelMapFilter<SI, SL> {
     pub fn new(binary: SI, intensity: SL) -> Self { Self { binary, intensity } }
 }
 
-impl<P, SI, SL> BinaryImageToStatisticsLabelMapFilter<SI, SL>
-where
-    P: crate::pixel::NumericPixel,
-    SI: crate::source::ImageSource<P, 2>,
-    SL: crate::source::ImageSource<P, 2>,
+impl<SI, SL> BinaryImageToStatisticsLabelMapFilter<SI, SL>
 {
-    pub fn compute(&self) -> Vec<crate::filters::statistics::LabelStatisticsResult> {
-        let cc = crate::filters::segmentation::ConnectedComponentFilter::<_, P>::new(&self.binary);
+    pub fn compute<P>(&self) -> Vec<crate::filters::statistics::LabelStatisticsResult>
+    where
+        P: crate::pixel::NumericPixel,
+        SI: crate::source::ImageSource<P, 2> + Sync,
+        SL: crate::source::ImageSource<P, 2>,
+    {
+        let binary_img = self.binary.generate_region(self.binary.largest_region());
+        let cc = crate::filters::segmentation::ConnectedComponentFilter::<_, P>::new(binary_img);
         let label_img = cc.generate_region(cc.largest_region());
         let lsf = crate::filters::statistics::LabelStatisticsFilter {
             intensity: &self.intensity,

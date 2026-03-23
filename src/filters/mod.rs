@@ -25,6 +25,10 @@ pub mod displacement;
 pub mod registration;
 pub mod fft;
 pub mod deconvolution;
+pub mod dti;
+pub mod optimizer;
+pub mod registration_methods;
+pub mod bias_correction;
 
 use std::marker::PhantomData;
 

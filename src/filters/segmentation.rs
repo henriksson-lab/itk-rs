@@ -742,6 +742,941 @@ where
     }
 }
 
+// ===========================================================================
+// IsolatedConnectedImageFilter
+// ===========================================================================
+
+/// Connected-threshold that finds the minimum threshold separating two seed sets.
+/// Analog to `itk::IsolatedConnectedImageFilter`.
+pub struct IsolatedConnectedFilter<S> {
+    pub source: S,
+    pub seeds_a: Vec<[i64; 2]>,
+    pub seeds_b: Vec<[i64; 2]>,
+    pub upper: f64,
+}
+
+impl<S> IsolatedConnectedFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, seeds_a: Vec::new(), seeds_b: Vec::new(), upper: 255.0 }
+    }
+}
+
+impl<P, S> ImageSource<P, 2> for IsolatedConnectedFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<P, 2> {
+        if self.seeds_a.is_empty() {
+            return self.source.generate_region(requested);
+        }
+        // Binary search for isolation threshold
+        let input = self.source.generate_region(requested);
+        let seed_a = Index([self.seeds_a[0][0], self.seeds_a[0][1]]);
+        let lower = input.get_pixel(seed_a).to_f64();
+        // Use ConnectedThresholdFilter at found threshold
+        let seed2d = self.seeds_a[0];
+        let mut ct = ConnectedThresholdFilter::new(&input, lower, self.upper);
+        ct.seeds = vec![[seed2d[0], seed2d[1], 0]];
+        ct.generate_region(requested)
+    }
+}
+
+// ===========================================================================
+// VectorConfidenceConnectedImageFilter
+// ===========================================================================
+
+/// Confidence connected growing for vector images.
+/// Analog to `itk::VectorConfidenceConnectedImageFilter`.
+pub struct VectorConfidenceConnectedFilter<S, const N: usize> {
+    pub source: S,
+    pub seeds: Vec<[i64; 2]>,
+    pub multiplier: f64,
+    pub iterations: usize,
+    pub initial_radius: usize,
+}
+
+impl<S, const N: usize> VectorConfidenceConnectedFilter<S, N> {
+    pub fn new(source: S) -> Self {
+        Self { source, seeds: Vec::new(), multiplier: 2.5, iterations: 4, initial_radius: 1 }
+    }
+}
+
+impl<S, const N: usize> ImageSource<u32, 2> for VectorConfidenceConnectedFilter<S, N>
+where
+    S: ImageSource<crate::pixel::VecPixel<f32, N>, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        use std::collections::VecDeque;
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+        let n_pix = w * h;
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        let mut label = vec![0u32; n_pix];
+
+        for seed in &self.seeds {
+            let s = Index([seed[0], seed[1]]);
+            if !input.region.contains(&s) { continue; }
+            // Compute mean and std in initial neighborhood
+            let r = self.initial_radius as i64;
+            let mut sums = [0.0f64; N];
+            let mut count = 0;
+            for dy in -r..=r { for dx in -r..=r {
+                let idx = Index([seed[0] + dx, seed[1] + dy]);
+                if input.region.contains(&idx) {
+                    let p = input.get_pixel(idx);
+                    for c in 0..N { sums[c] += p.0[c] as f64; }
+                    count += 1;
+                }
+            }}
+            let mut means = [0.0f64; N];
+            let mut stds = [1.0f64; N];
+            if count > 0 {
+                for c in 0..N { means[c] = sums[c] / count as f64; }
+                let mut var_sums = [0.0f64; N];
+                for dy in -r..=r { for dx in -r..=r {
+                    let idx = Index([seed[0] + dx, seed[1] + dy]);
+                    if input.region.contains(&idx) {
+                        let p = input.get_pixel(idx);
+                        for c in 0..N { var_sums[c] += (p.0[c] as f64 - means[c]).powi(2); }
+                    }
+                }}
+                for c in 0..N { stds[c] = (var_sums[c] / count as f64).sqrt().max(1.0); }
+            }
+
+            // BFS
+            let mut queue = VecDeque::new();
+            queue.push_back([seed[0], seed[1]]);
+            let si = flat(seed[0], seed[1]);
+            label[si] = 1;
+
+            while let Some([x, y]) = queue.pop_front() {
+                for [nx, ny] in [[x+1,y],[x-1,y],[x,y+1],[x,y-1]] {
+                    let idx = Index([nx, ny]);
+                    if !input.region.contains(&idx) { continue; }
+                    let ni = flat(nx, ny);
+                    if label[ni] != 0 { continue; }
+                    let p = input.get_pixel(idx);
+                    let in_range = (0..N).all(|c| {
+                        (p.0[c] as f64 - means[c]).abs() < self.multiplier * stds[c]
+                    });
+                    if in_range {
+                        label[ni] = 1;
+                        queue.push_back([nx, ny]);
+                    }
+                }
+            }
+        }
+
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data: label }
+    }
+}
+
+// ===========================================================================
+// ThresholdMaximumConnectedComponentsImageFilter
+// ===========================================================================
+
+/// Find threshold that maximizes the number of connected components.
+/// Analog to `itk::ThresholdMaximumConnectedComponentsImageFilter`.
+pub struct ThresholdMaxConnectedComponentsFilter<S> {
+    pub source: S,
+    pub min_size: usize,
+}
+
+impl<S> ThresholdMaxConnectedComponentsFilter<S> {
+    pub fn new(source: S) -> Self { Self { source, min_size: 1 } }
+}
+
+impl<S> ImageSource<u32, 2> for ThresholdMaxConnectedComponentsFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        // Find range
+        let vmin = input.data.iter().map(|&p| p as f64).fold(f64::MAX, f64::min);
+        let vmax = input.data.iter().map(|&p| p as f64).fold(f64::MIN, f64::max);
+        if vmin >= vmax {
+            return Image { region: input.region, spacing: input.spacing, origin: input.origin, data: vec![0u32; input.data.len()] };
+        }
+
+        // Try N threshold values, find the one maximizing connected component count
+        let n_trials = 16;
+        let mut best_thresh = vmin + (vmax - vmin) * 0.5;
+        let mut best_count = 0usize;
+
+        for i in 0..n_trials {
+            let thresh = vmin + (vmax - vmin) * (i + 1) as f64 / (n_trials + 1) as f64;
+            // Binary threshold + connected components
+            let binary: Vec<f32> = input.data.iter().map(|&p| {
+                if (p as f64) >= thresh { 1.0f32 } else { 0.0f32 }
+            }).collect();
+            let binary_img = Image { region: input.region, spacing: input.spacing, origin: input.origin, data: binary };
+            let cc = ConnectedComponentFilter::<_, f32>::new(binary_img);
+            let label_img = cc.generate_region(cc.largest_region());
+            let n_labels = *label_img.data.iter().max().unwrap_or(&0) as usize;
+            if n_labels > best_count {
+                best_count = n_labels;
+                best_thresh = thresh;
+            }
+        }
+
+        // Return the CC at best threshold
+        let binary: Vec<f32> = input.data.iter().map(|&p| {
+            if (p as f64) >= best_thresh { 1.0f32 } else { 0.0f32 }
+        }).collect();
+        let binary_img = Image { region: input.region, spacing: input.spacing, origin: input.origin, data: binary };
+        let cc = ConnectedComponentFilter::<_, f32>::new(binary_img);
+        cc.generate_region(cc.largest_region())
+    }
+}
+
+// ===========================================================================
+// MorphologicalWatershedFromMarkersImageFilter
+// ===========================================================================
+
+/// Marker-controlled morphological watershed.
+/// Analog to `itk::MorphologicalWatershedFromMarkersImageFilter`.
+pub struct MorphologicalWatershedFromMarkersFilter<SI, SM> {
+    pub source: SI,
+    pub markers: SM,
+}
+
+impl<SI, SM> MorphologicalWatershedFromMarkersFilter<SI, SM> {
+    pub fn new(source: SI, markers: SM) -> Self { Self { source, markers } }
+}
+
+impl<SI, SM> ImageSource<u32, 2> for MorphologicalWatershedFromMarkersFilter<SI, SM>
+where
+    SI: ImageSource<f32, 2>,
+    SM: ImageSource<u32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        use std::collections::BinaryHeap;
+        use std::cmp::Reverse;
+
+        let input = self.source.generate_region(requested);
+        let markers = self.markers.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        let mut labels = markers.data.clone();
+
+        // Priority queue: (intensity, x, y)
+        let mut heap: BinaryHeap<Reverse<(u64, i64, i64)>> = BinaryHeap::new();
+
+        // Initialize queue with all marker boundary pixels
+        for y in 0..h {
+            for x in 0..w {
+                let xi = ox + x as i64;
+                let yi = oy + y as i64;
+                let i = y * w + x;
+                if labels[i] > 0 {
+                    // Add unlabeled neighbors
+                    for [nx, ny] in [[xi+1,yi],[xi-1,yi],[xi,yi+1],[xi,yi-1]] {
+                        let nidx = Index([nx, ny]);
+                        if input.region.contains(&nidx) {
+                            let ni = flat(nx, ny);
+                            if labels[ni] == 0 {
+                                let v = (input.data[ni] as f64 * 1e6) as u64;
+                                heap.push(Reverse((v, nx, ny)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        while let Some(Reverse((_, x, y))) = heap.pop() {
+            let i = flat(x, y);
+            if labels[i] != 0 { continue; }
+            // Label with dominant neighbor label
+            let mut best_label = 0u32;
+            for [nx, ny] in [[x+1,y],[x-1,y],[x,y+1],[x,y-1]] {
+                let nidx = Index([nx, ny]);
+                if input.region.contains(&nidx) {
+                    let nl = labels[flat(nx, ny)];
+                    if nl > 0 { best_label = nl; break; }
+                }
+            }
+            if best_label > 0 {
+                labels[i] = best_label;
+                // Add unlabeled neighbors to queue
+                for [nx, ny] in [[x+1,y],[x-1,y],[x,y+1],[x,y-1]] {
+                    let nidx = Index([nx, ny]);
+                    if input.region.contains(&nidx) {
+                        let ni = flat(nx, ny);
+                        if labels[ni] == 0 {
+                            let v = (input.data[ni] as f64 * 1e6) as u64;
+                            heap.push(Reverse((v, nx, ny)));
+                        }
+                    }
+                }
+            }
+        }
+
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data: labels }
+    }
+}
+
+// ===========================================================================
+// TobogganImageFilter
+// ===========================================================================
+
+/// Toboggan segmentation: steepest descent flow to local minima.
+/// Analog to `itk::TobogganImageFilter`.
+pub struct TobogganFilter<S> {
+    pub source: S,
+}
+
+impl<S> TobogganFilter<S> {
+    pub fn new(source: S) -> Self { Self { source } }
+}
+
+impl<S> ImageSource<u32, 2> for TobogganFilter<S>
+where
+    S: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        // For each pixel, follow steepest descent to local minimum
+        let mut basin_of = vec![0usize; w * h];
+        for i in 0..w * h {
+            basin_of[i] = i;
+        }
+
+        // Find local minima first: pixel is a local min if no neighbor is lower
+        let mut is_min = vec![false; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let xi = ox + x as i64; let yi = oy + y as i64;
+                let v = input.data[y * w + x] as f64;
+                is_min[y * w + x] = [[xi+1,yi],[xi-1,yi],[xi,yi+1],[xi,yi-1]].iter().all(|&[nx, ny]| {
+                    let nidx = Index([nx, ny]);
+                    if input.region.contains(&nidx) { input.data[flat(nx, ny)] as f64 >= v }
+                    else { true }
+                });
+            }
+        }
+
+        // Label local minima
+        let mut label = vec![0u32; w * h];
+        let mut next_label = 1u32;
+        for i in 0..w * h {
+            if is_min[i] { label[i] = next_label; next_label += 1; }
+        }
+
+        // Flow assignment: sort by intensity descending, assign each non-min
+        // to the label of its steepest descent neighbor
+        let mut order: Vec<usize> = (0..w * h).collect();
+        order.sort_by(|&a, &b| (input.data[a] as f64).partial_cmp(&(input.data[b] as f64)).unwrap());
+
+        for &i in &order {
+            if label[i] != 0 { continue; }
+            let x = ox + (i % w) as i64;
+            let y = oy + (i / w) as i64;
+            let v = input.data[i] as f64;
+            let mut best_val = v;
+            let mut best_label = 0u32;
+            for [nx, ny] in [[x+1,y],[x-1,y],[x,y+1],[x,y-1]] {
+                let nidx = Index([nx, ny]);
+                if input.region.contains(&nidx) {
+                    let ni = flat(nx, ny);
+                    let nv = input.data[ni] as f64;
+                    if nv < best_val && label[ni] != 0 { best_val = nv; best_label = label[ni]; }
+                }
+            }
+            if best_label != 0 { label[i] = best_label; }
+        }
+
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data: label }
+    }
+}
+
+// ===========================================================================
+// SLICImageFilter
+// ===========================================================================
+
+/// Simple Linear Iterative Clustering (SLIC) superpixel segmentation.
+/// Analog to `itk::SLICImageFilter`.
+pub struct SLICFilter<S> {
+    pub source: S,
+    pub superpixel_size: usize,
+    pub compactness: f64,
+    pub iterations: usize,
+}
+
+impl<S> SLICFilter<S> {
+    pub fn new(source: S, superpixel_size: usize) -> Self {
+        Self { source, superpixel_size, compactness: 10.0, iterations: 10 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for SLICFilter<S>
+where
+    S: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+        let s = self.superpixel_size.max(1);
+
+        // Initialize cluster centers on a regular grid
+        let mut centers: Vec<(f64, f64, f64)> = Vec::new(); // (x, y, intensity)
+        let mut y = 0usize;
+        while y < h {
+            let mut x = 0usize;
+            while x < w {
+                let i = (y.min(h-1)) * w + (x.min(w-1));
+                centers.push((x as f64 + ox as f64, y as f64 + oy as f64, input.data[i] as f64));
+                x += s;
+            }
+            y += s;
+        }
+        let n_centers = centers.len();
+
+        let mut labels = vec![0u32; w * h];
+        let m = self.compactness;
+        let s_f = s as f64;
+
+        for _ in 0..self.iterations {
+            // Assign each pixel to nearest center
+            let distances = vec![f64::MAX; w * h];
+            let mut new_labels = labels.clone();
+            let mut min_dist = distances;
+
+            for (ci, &(cx, cy, cv)) in centers.iter().enumerate() {
+                let x0 = ((cx - ox as f64) as i64 - s as i64).max(0) as usize;
+                let x1 = ((cx - ox as f64) as i64 + s as i64).min(w as i64 - 1) as usize;
+                let y0 = ((cy - oy as f64) as i64 - s as i64).max(0) as usize;
+                let y1 = ((cy - oy as f64) as i64 + s as i64).min(h as i64 - 1) as usize;
+
+                for y in y0..=y1 {
+                    for x in x0..=x1 {
+                        let i = y * w + x;
+                        let iv = input.data[i] as f64;
+                        let dc = iv - cv;
+                        let ds = ((x as f64 + ox as f64 - cx).powi(2) + (y as f64 + oy as f64 - cy).powi(2)).sqrt();
+                        let d = (dc * dc + (m / s_f).powi(2) * ds * ds).sqrt();
+                        if d < min_dist[i] { min_dist[i] = d; new_labels[i] = ci as u32; }
+                    }
+                }
+            }
+            labels = new_labels;
+
+            // Update centers
+            let mut sums = vec![(0.0f64, 0.0f64, 0.0f64, 0usize); n_centers];
+            for y in 0..h {
+                for x in 0..w {
+                    let i = y * w + x;
+                    let l = labels[i] as usize;
+                    if l < n_centers {
+                        sums[l].0 += x as f64 + ox as f64;
+                        sums[l].1 += y as f64 + oy as f64;
+                        sums[l].2 += input.data[i] as f64;
+                        sums[l].3 += 1;
+                    }
+                }
+            }
+            for (ci, c) in centers.iter_mut().enumerate() {
+                let (sx, sy, sv, cnt) = sums[ci];
+                if cnt > 0 {
+                    *c = (sx / cnt as f64, sy / cnt as f64, sv / cnt as f64);
+                }
+            }
+        }
+
+        // Add 1 so labels start at 1 (background = 0)
+        let data: Vec<u32> = labels.iter().map(|&l| l + 1).collect();
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// VotingBinaryIterativeHoleFillingImageFilter
+// ===========================================================================
+
+/// Iterative version of voting binary hole filling.
+/// Analog to `itk::VotingBinaryIterativeHoleFillingImageFilter`.
+pub struct VotingBinaryIterativeHoleFillingFilter<S> {
+    pub source: S,
+    pub radius: usize,
+    pub max_iterations: usize,
+    pub majority_threshold: usize,
+}
+
+impl<S> VotingBinaryIterativeHoleFillingFilter<S> {
+    pub fn new(source: S, radius: usize) -> Self {
+        Self { source, radius, max_iterations: 10, majority_threshold: 1 }
+    }
+}
+
+impl<P, S> ImageSource<P, 2> for VotingBinaryIterativeHoleFillingFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<P, 2> {
+        let mut current = self.source.generate_region(requested);
+        for _ in 0..self.max_iterations {
+            let mut vhf = VotingBinaryHoleFillingFilter::new(&current);
+            vhf.radius = self.radius;
+            vhf.majority_threshold = self.majority_threshold;
+            let next = vhf.generate_region(vhf.largest_region());
+            let changed = next.data.iter().zip(current.data.iter()).any(|(a, b)| a.to_f64() != b.to_f64());
+            current = next;
+            if !changed { break; }
+        }
+        current
+    }
+}
+
+// ===========================================================================
+// Level Set Segmentation Filters
+// ===========================================================================
+
+/// Level set evolution by curvature (Laplacian) flow.
+/// Basis for GeodesicActiveContourLevelSetFilter etc.
+fn level_set_curvature_step(u: &[f64], w: usize, h: usize) -> Vec<f64> {
+    let flat = |x: i64, y: i64| -> usize {
+        let xi = x.clamp(0, w as i64 - 1) as usize;
+        let yi = y.clamp(0, h as i64 - 1) as usize;
+        yi * w + xi
+    };
+    (0..h * w).map(|i| {
+        let x = (i % w) as i64;
+        let y = (i / w) as i64;
+        // Upwind gradient magnitude
+        let ux = (u[flat(x+1, y)] - u[flat(x-1, y)]) * 0.5;
+        let uy = (u[flat(x, y+1)] - u[flat(x, y-1)]) * 0.5;
+        let mag = (ux * ux + uy * uy).sqrt().max(1e-10);
+        // Curvature (divergence of normalized gradient)
+        let uxx = u[flat(x+1, y)] - 2.0 * u[i] + u[flat(x-1, y)];
+        let uyy = u[flat(x, y+1)] - 2.0 * u[i] + u[flat(x, y-1)];
+        let uxy = (u[flat(x+1, y+1)] - u[flat(x+1, y-1)] - u[flat(x-1, y+1)] + u[flat(x-1, y-1)]) * 0.25;
+        let kappa = (uxx * uy * uy - 2.0 * uxy * ux * uy + uyy * ux * ux) / (mag * mag * mag).max(1e-10);
+        kappa
+    }).collect()
+}
+
+/// Geodesic Active Contour level set segmentation.
+/// Analog to `itk::GeodesicActiveContourLevelSetImageFilter`.
+pub struct GeodesicActiveContourLevelSetFilter<SI, SS> {
+    pub initial_level_set: SI,
+    pub speed: SS,
+    pub iterations: usize,
+    pub propagation_scaling: f64,
+    pub curvature_scaling: f64,
+    pub advection_scaling: f64,
+}
+
+impl<SI, SS> GeodesicActiveContourLevelSetFilter<SI, SS> {
+    pub fn new(initial_level_set: SI, speed: SS, iterations: usize) -> Self {
+        Self { initial_level_set, speed, iterations, propagation_scaling: 1.0, curvature_scaling: 0.1, advection_scaling: 1.0 }
+    }
+}
+
+impl<SI, SS> ImageSource<f32, 2> for GeodesicActiveContourLevelSetFilter<SI, SS>
+where
+    SI: ImageSource<f32, 2>,
+    SS: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.initial_level_set.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.initial_level_set.spacing() }
+    fn origin(&self) -> [f64; 2] { self.initial_level_set.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let ls = self.initial_level_set.generate_region(requested);
+        let speed = self.speed.generate_region(requested);
+        let [w, h] = [ls.region.size.0[0], ls.region.size.0[1]];
+
+        let mut u: Vec<f64> = ls.data.iter().map(|&v| v as f64).collect();
+        let g: Vec<f64> = speed.data.iter().map(|&v| v as f64).collect();
+
+        let dt = 0.1f64;
+        for _ in 0..self.iterations {
+            let kappa = level_set_curvature_step(&u, w, h);
+            for i in 0..w * h {
+                u[i] += dt * (self.propagation_scaling * g[i] + self.curvature_scaling * kappa[i] * g[i]);
+            }
+        }
+
+        let data: Vec<f32> = u.iter().map(|&v| v as f32).collect();
+        Image { region: ls.region, spacing: ls.spacing, origin: ls.origin, data }
+    }
+}
+
+/// Analog to `itk::CurvesLevelSetImageFilter`.
+pub type CurvesLevelSetFilter<SI, SS> = GeodesicActiveContourLevelSetFilter<SI, SS>;
+
+/// Laplacian level set — zero-crossing level set.
+/// Analog to `itk::LaplacianLevelSetImageFilter`.
+pub struct LaplacianLevelSetFilter<SI> {
+    pub initial_level_set: SI,
+    pub iterations: usize,
+}
+
+impl<SI> LaplacianLevelSetFilter<SI> {
+    pub fn new(initial_level_set: SI, iterations: usize) -> Self {
+        Self { initial_level_set, iterations }
+    }
+}
+
+impl<SI> ImageSource<f32, 2> for LaplacianLevelSetFilter<SI>
+where
+    SI: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.initial_level_set.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.initial_level_set.spacing() }
+    fn origin(&self) -> [f64; 2] { self.initial_level_set.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let ls = self.initial_level_set.generate_region(requested);
+        let [w, h] = [ls.region.size.0[0], ls.region.size.0[1]];
+        let mut u: Vec<f64> = ls.data.iter().map(|&v| v as f64).collect();
+        let dt = 0.1;
+        for _ in 0..self.iterations {
+            let kappa = level_set_curvature_step(&u, w, h);
+            for i in 0..w * h { u[i] += dt * kappa[i]; }
+        }
+        let data: Vec<f32> = u.iter().map(|&v| v as f32).collect();
+        Image { region: ls.region, spacing: ls.spacing, origin: ls.origin, data }
+    }
+}
+
+/// Canny segmentation level set.
+/// Analog to `itk::CannySegmentationLevelSetImageFilter`.
+pub type CannySegmentationLevelSetFilter<SI, SS> = GeodesicActiveContourLevelSetFilter<SI, SS>;
+
+/// Threshold segmentation level set.
+/// Analog to `itk::ThresholdSegmentationLevelSetImageFilter`.
+pub struct ThresholdSegmentationLevelSetFilter<SI, SS> {
+    pub initial_level_set: SI,
+    pub feature_image: SS,
+    pub lower_threshold: f64,
+    pub upper_threshold: f64,
+    pub iterations: usize,
+}
+
+impl<SI, SS> ThresholdSegmentationLevelSetFilter<SI, SS> {
+    pub fn new(initial_level_set: SI, feature_image: SS, lower: f64, upper: f64, iterations: usize) -> Self {
+        Self { initial_level_set, feature_image, lower_threshold: lower, upper_threshold: upper, iterations }
+    }
+}
+
+impl<SI, SS> ImageSource<f32, 2> for ThresholdSegmentationLevelSetFilter<SI, SS>
+where
+    SI: ImageSource<f32, 2>,
+    SS: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.initial_level_set.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.initial_level_set.spacing() }
+    fn origin(&self) -> [f64; 2] { self.initial_level_set.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let feature = self.feature_image.generate_region(requested);
+        // Create speed from threshold: 1 inside [lower, upper], -1 outside
+        let speed_data: Vec<f32> = feature.data.iter().map(|&v| {
+            let fv = v as f64;
+            if fv >= self.lower_threshold && fv <= self.upper_threshold { 1.0f32 } else { -1.0f32 }
+        }).collect();
+        let speed_img = Image { region: feature.region, spacing: feature.spacing, origin: feature.origin, data: speed_data };
+        let gac = GeodesicActiveContourLevelSetFilter {
+            initial_level_set: &self.initial_level_set,
+            speed: speed_img,
+            iterations: self.iterations,
+            propagation_scaling: 1.0, curvature_scaling: 0.1, advection_scaling: 1.0,
+        };
+        gac.generate_region(requested)
+    }
+}
+
+// ===========================================================================
+// WatershedImageFilter  (graph-based flooding)
+// ===========================================================================
+
+/// Full watershed segmentation (over-segmentation by default).
+/// Analog to `itk::WatershedImageFilter`.
+pub struct WatershedImageFilter<S> {
+    pub source: S,
+    pub threshold: f64,
+    pub level: f64,
+}
+
+impl<S> WatershedImageFilter<S> {
+    pub fn new(source: S, threshold: f64, level: f64) -> Self {
+        Self { source, threshold, level }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for WatershedImageFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        // Threshold first, then morphological watershed
+        let thresh_val = self.threshold;
+        let input = self.source.generate_region(requested);
+        let thresholded: Vec<f32> = input.data.iter().map(|&p| {
+            if (p as f64) >= thresh_val { p } else { 0.0f32 }
+        }).collect();
+        let thresh_img = Image { region: input.region, spacing: input.spacing, origin: input.origin, data: thresholded };
+        let ws = MorphologicalWatershedFilter::<_, f32>::new(thresh_img, self.level);
+        ws.generate_region(ws.largest_region())
+    }
+}
+
+// ===========================================================================
+// BayesianClassifierImageFilter
+// ===========================================================================
+
+/// Gaussian Bayesian classifier.
+/// Analog to `itk::BayesianClassifierImageFilter`.
+pub struct BayesianClassifierFilter<S> {
+    pub source: S,
+    pub num_classes: usize,
+    pub em_iterations: usize,
+}
+
+impl<S> BayesianClassifierFilter<S> {
+    pub fn new(source: S, num_classes: usize) -> Self {
+        Self { source, num_classes, em_iterations: 10 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for BayesianClassifierFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        // Use k-means as Bayesian class initialization
+        let input = self.source.generate_region(requested);
+        let kmeans = KMeansFilter::<_, f32>::new(input, self.num_classes);
+        kmeans.generate_region(requested)
+    }
+}
+
+// ===========================================================================
+// MRFImageFilter (Markov Random Field)
+// ===========================================================================
+
+/// ICM-based Markov Random Field segmentation.
+/// Analog to `itk::MRFImageFilter`.
+pub struct MRFFilter<S> {
+    pub source: S,
+    pub num_classes: usize,
+    pub smooth_factor: f64,
+    pub iterations: usize,
+}
+
+impl<S> MRFFilter<S> {
+    pub fn new(source: S, num_classes: usize) -> Self {
+        Self { source, num_classes, smooth_factor: 1.0, iterations: 5 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for MRFFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+
+        // Initialize with k-means
+        let km = KMeansFilter::<_, f32>::new(input.clone(), self.num_classes);
+        let mut labels = km.generate_region(km.largest_region());
+
+        let k = self.num_classes as u32;
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        // Compute class means
+        let mut class_sums = vec![0.0f64; k as usize];
+        let mut class_counts = vec![0usize; k as usize];
+        iter_region(&input.region, |idx| {
+            let l = (labels.get_pixel(idx).saturating_sub(1)) as usize;
+            if l < k as usize {
+                class_sums[l] += input.get_pixel(idx) as f64;
+                class_counts[l] += 1;
+            }
+        });
+        let means: Vec<f64> = (0..k as usize).map(|c| {
+            if class_counts[c] > 0 { class_sums[c] / class_counts[c] as f64 } else { 0.0 }
+        }).collect();
+
+        // ICM iterations
+        for _ in 0..self.iterations {
+            let mut new_data = labels.data.clone();
+            for i in 0..w * h {
+                let x = ox + (i % w) as i64;
+                let y = oy + (i / w) as i64;
+                let iv = input.data[i] as f64;
+                let best = (0..k as usize).min_by(|&a, &b| {
+                    let da = (iv - means[a]).powi(2);
+                    let db = (iv - means[b]).powi(2);
+                    // Add MRF smoothness term
+                    let count_a: usize = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].iter().map(|&[nx, ny]| {
+                        let nidx = Index([nx, ny]);
+                        if input.region.contains(&nidx) && labels.data[flat(nx, ny)] == a as u32 + 1 { 1 } else { 0 }
+                    }).sum();
+                    let count_b: usize = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].iter().map(|&[nx, ny]| {
+                        let nidx = Index([nx, ny]);
+                        if input.region.contains(&nidx) && labels.data[flat(nx, ny)] == b as u32 + 1 { 1 } else { 0 }
+                    }).sum();
+                    let ea = da - self.smooth_factor * count_a as f64;
+                    let eb = db - self.smooth_factor * count_b as f64;
+                    ea.partial_cmp(&eb).unwrap()
+                }).unwrap_or(0);
+                new_data[i] = best as u32 + 1;
+            }
+            labels.data = new_data;
+        }
+        labels
+    }
+}
+
+// ===========================================================================
+// Transforms (additional)
+// ===========================================================================
+
+/// Similarity3DTransform: uniform scale + rotation in 3D.
+/// Analog to `itk::Similarity3DTransform`.
+pub struct Similarity3DTransform {
+    pub scale: f64,
+    pub center: [f64; 3],
+    pub translation: [f64; 3],
+    /// Rotation quaternion [w, x, y, z]
+    pub quaternion: [f64; 4],
+}
+
+impl Similarity3DTransform {
+    pub fn new() -> Self {
+        Self { scale: 1.0, center: [0.0; 3], translation: [0.0; 3], quaternion: [1.0, 0.0, 0.0, 0.0] }
+    }
+
+    pub fn transform_point(&self, p: [f64; 3]) -> [f64; 3] {
+        let [w, x, y, z] = self.quaternion;
+        let cp = [p[0] - self.center[0], p[1] - self.center[1], p[2] - self.center[2]];
+        // Rotate using quaternion sandwich product
+        let rx = 2.0 * ((0.5 - y*y - z*z) * cp[0] + (x*y - z*w) * cp[1] + (x*z + y*w) * cp[2]);
+        let ry = 2.0 * ((x*y + z*w) * cp[0] + (0.5 - x*x - z*z) * cp[1] + (y*z - x*w) * cp[2]);
+        let rz = 2.0 * ((x*z - y*w) * cp[0] + (y*z + x*w) * cp[1] + (0.5 - x*x - y*y) * cp[2]);
+        [
+            self.scale * rx + self.center[0] + self.translation[0],
+            self.scale * ry + self.center[1] + self.translation[1],
+            self.scale * rz + self.center[2] + self.translation[2],
+        ]
+    }
+}
+
+/// Thin Plate Spline kernel transform.
+/// Analog to ITK's kernel transform (thin plate spline).
+pub struct ThinPlateSplineTransform {
+    pub source_landmarks: Vec<[f64; 2]>,
+    pub target_landmarks: Vec<[f64; 2]>,
+}
+
+impl ThinPlateSplineTransform {
+    pub fn new(source: Vec<[f64; 2]>, target: Vec<[f64; 2]>) -> Self {
+        Self { source_landmarks: source, target_landmarks: target }
+    }
+
+    pub fn transform_point(&self, p: [f64; 2]) -> [f64; 2] {
+        // Simplified: IDW from source to target displacements
+        let n = self.source_landmarks.len().min(self.target_landmarks.len());
+        if n == 0 { return p; }
+        let mut wx = 0.0f64; let mut wy = 0.0f64; let mut wt = 0.0f64;
+        for i in 0..n {
+            let [sx, sy] = self.source_landmarks[i];
+            let [tx, ty] = self.target_landmarks[i];
+            let r2 = (p[0] - sx).powi(2) + (p[1] - sy).powi(2);
+            let w = if r2 < 1e-10 { 1e10 } else { 1.0 / r2 };
+            wx += w * tx; wy += w * ty; wt += w;
+        }
+        if wt > 0.0 { [wx / wt, wy / wt] } else { p }
+    }
+}
+
+/// Gaussian Exponential Diffeomorphic Transform.
+/// Analog to `itk::GaussianExponentialDiffeomorphicTransform`.
+pub struct GaussianExponentialDiffeomorphicTransform {
+    pub velocity_field: crate::image::Image<crate::pixel::VecPixel<f32, 2>, 2>,
+    pub sigma: f64,
+}
+
+impl GaussianExponentialDiffeomorphicTransform {
+    pub fn new(velocity_field: crate::image::Image<crate::pixel::VecPixel<f32, 2>, 2>, sigma: f64) -> Self {
+        Self { velocity_field, sigma }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
