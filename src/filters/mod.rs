@@ -1,4 +1,4 @@
-mod conv;
+pub(crate) mod conv;
 pub mod gaussian;
 pub mod mean;
 pub mod median;
@@ -8,6 +8,19 @@ pub mod bilateral;
 pub mod anisotropic_diffusion;
 pub mod intensity;
 pub mod threshold;
+pub mod edges;
+pub mod morphology;
+pub mod spatial;
+pub mod statistics;
+pub mod noise;
+pub mod sources;
+pub mod convolution;
+pub mod distance;
+pub mod fast_marching;
+pub mod curvature_flow;
+pub mod segmentation;
+pub mod colormap;
+pub mod label_map;
 
 use std::marker::PhantomData;
 

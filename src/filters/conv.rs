@@ -8,7 +8,7 @@ use crate::pixel::NumericPixel;
 /// Apply a 1-D convolution kernel along `axis` of `src`, producing `requested`.
 /// Out-of-bounds samples use zero-flux Neumann (clamp-to-edge) boundary.
 /// Parallelised over output pixels with rayon.
-pub(super) fn convolve_axis<P, const D: usize>(
+pub(crate) fn convolve_axis<P, const D: usize>(
     src: &Image<P, D>,
     axis: usize,
     kernel: &[f64],

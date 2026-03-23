@@ -58,6 +58,22 @@ impl<P: Pixel, const D: usize> ImageSource<P, D> for Image<P, D> {
     }
 }
 
+/// Blanket impl: a shared reference to any `ImageSource` is also an `ImageSource`.
+impl<P: Pixel, S, const D: usize> ImageSource<P, D> for &S
+where
+    S: ImageSource<P, D>,
+{
+    fn largest_region(&self) -> Region<D> { (*self).largest_region() }
+    fn spacing(&self) -> [f64; D] { (*self).spacing() }
+    fn origin(&self) -> [f64; D] { (*self).origin() }
+    fn input_region_for_output(&self, output_region: &Region<D>) -> Region<D> {
+        (*self).input_region_for_output(output_region)
+    }
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        (*self).generate_region(requested)
+    }
+}
+
 /// Drive a source through all its data in `num_pieces` streaming chunks.
 ///
 /// Analog to itk::StreamingImageFilter: allocates the full output buffer once,

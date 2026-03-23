@@ -30,6 +30,34 @@ impl NumericPixel for f64 {
     fn to_f64(self) -> f64 { self }
 }
 
+impl NumericPixel for u8 {
+    fn zero() -> Self { 0 }
+    fn scale(self, w: f64) -> Self { (self as f64 * w).round().clamp(0.0, 255.0) as u8 }
+    fn from_f64(v: f64) -> Self { v.round().clamp(0.0, 255.0) as u8 }
+    fn to_f64(self) -> f64 { self as f64 }
+}
+
+impl NumericPixel for u16 {
+    fn zero() -> Self { 0 }
+    fn scale(self, w: f64) -> Self { (self as f64 * w).round().clamp(0.0, 65535.0) as u16 }
+    fn from_f64(v: f64) -> Self { v.round().clamp(0.0, 65535.0) as u16 }
+    fn to_f64(self) -> f64 { self as f64 }
+}
+
+impl NumericPixel for u32 {
+    fn zero() -> Self { 0 }
+    fn scale(self, w: f64) -> Self { (self as f64 * w).round() as u32 }
+    fn from_f64(v: f64) -> Self { v.round().max(0.0) as u32 }
+    fn to_f64(self) -> f64 { self as f64 }
+}
+
+impl NumericPixel for i32 {
+    fn zero() -> Self { 0 }
+    fn scale(self, w: f64) -> Self { (self as f64 * w).round() as i32 }
+    fn from_f64(v: f64) -> Self { v.round() as i32 }
+    fn to_f64(self) -> f64 { self as f64 }
+}
+
 /// Fixed-length vector pixel. Analog to itk::Vector<T, N>.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct VecPixel<T, const N: usize>(pub [T; N]);

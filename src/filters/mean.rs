@@ -143,6 +143,108 @@ where
     }
 }
 
+// ---------------------------------------------------------------------------
+// BoxSigmaFilter
+// ---------------------------------------------------------------------------
+
+/// Standard-deviation (sigma) filter over a box neighborhood.
+/// Analog to `itk::BoxSigmaImageFilter`.
+///
+/// Each output pixel is the sample standard deviation of all pixels within
+/// a box of `[-radius, +radius]` on each axis (in index space).
+pub struct BoxSigmaFilter<S, P, const D: usize> {
+    pub source: S,
+    pub radius: usize,
+    _phantom: std::marker::PhantomData<P>,
+}
+
+impl<S, P, const D: usize> BoxSigmaFilter<S, P, D> {
+    pub fn new(source: S, radius: usize) -> Self {
+        Self { source, radius, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<P, S, const D: usize> ImageSource<f32, D> for BoxSigmaFilter<S, P, D>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn input_region_for_output(&self, output_region: &Region<D>) -> Region<D> {
+        let radii = {
+            let mut a = [0usize; D];
+            a.iter_mut().for_each(|v| *v = self.radius);
+            a
+        };
+        output_region.padded_per_axis(&radii).clipped_to(&self.source.largest_region())
+    }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<f32, D> {
+        use crate::image::iter_region;
+        use rayon::prelude::*;
+
+        let radii = {
+            let mut a = [0usize; D];
+            a.iter_mut().for_each(|v| *v = self.radius);
+            a
+        };
+        let bounds = self.source.largest_region();
+        let input_region = requested.padded_per_axis(&radii).clipped_to(&bounds);
+        let input = self.source.generate_region(input_region);
+
+        let mut out_indices = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+
+        let data: Vec<f32> = out_indices
+            .par_iter()
+            .map(|&out_idx| {
+                let mut sum = 0.0f64;
+                let mut sum_sq = 0.0f64;
+                let mut count = 0u64;
+                // iterate over box neighborhood
+                let mut nb = [0i64; D];
+                for d in 0..D {
+                    nb[d] = -(self.radius as i64);
+                }
+                loop {
+                    let mut s = out_idx.0;
+                    for d in 0..D {
+                        s[d] = (out_idx.0[d] + nb[d])
+                            .max(bounds.index.0[d])
+                            .min(bounds.index.0[d] + bounds.size.0[d] as i64 - 1);
+                    }
+                    let v = input.get_pixel(crate::image::Index(s)).to_f64();
+                    sum += v;
+                    sum_sq += v * v;
+                    count += 1;
+                    // increment nb
+                    let mut carry = true;
+                    for d in 0..D {
+                        if carry {
+                            nb[d] += 1;
+                            if nb[d] > self.radius as i64 {
+                                nb[d] = -(self.radius as i64);
+                            } else {
+                                carry = false;
+                            }
+                        }
+                    }
+                    if carry { break; }
+                }
+                let n = count as f64;
+                let mean = sum / n;
+                let var = (sum_sq / n - mean * mean).max(0.0);
+                var.sqrt() as f32
+            })
+            .collect();
+
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -714,6 +714,514 @@ where
 }
 
 // ===========================================================================
+// Atan2 filter (binary, two images)
+// ===========================================================================
+
+/// Pixel-wise `atan2(y, x)`. Analog to `itk::Atan2ImageFilter`.
+pub fn atan2_images<P, S1, S2>(y: S1, x: S2)
+    -> BinaryFilter<S1, S2, fn(P, P) -> P, P, P, P>
+where P: NumericPixel
+{
+    BinaryFilter::new(y, x, |py, px| P::from_f64(py.to_f64().atan2(px.to_f64())))
+}
+
+// ===========================================================================
+// Normalize to constant filter
+// ===========================================================================
+
+/// Scale image so the sum of all pixels equals `constant`.
+/// Analog to `itk::NormalizeToConstantImageFilter`.
+pub struct NormalizeToConstantFilter<S> {
+    pub source: S,
+    pub constant: f64,
+}
+
+impl<S> NormalizeToConstantFilter<S> {
+    pub fn new(source: S, constant: f64) -> Self { Self { source, constant } }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for NormalizeToConstantFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+    fn input_region_for_output(&self, _: &Region<D>) -> Region<D> {
+        self.source.largest_region()
+    }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let full = self.source.generate_region(self.source.largest_region());
+        let sum: f64 = full.data.iter().map(|p| p.to_f64()).sum();
+        let scale = if sum.abs() < 1e-300 { 1.0 } else { self.constant / sum };
+
+        let mut out_indices: Vec<Index<D>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+        let data: Vec<P> = out_indices.par_iter()
+            .map(|&idx| P::from_f64(full.get_pixel(idx).to_f64() * scale))
+            .collect();
+        Image { region: requested, spacing: self.source.spacing(), origin: self.source.origin(), data }
+    }
+}
+
+// ===========================================================================
+// Bitwise filters (And, Or, Xor, Not)
+// ===========================================================================
+
+/// Pixel-wise bitwise AND (via f64 → u64 round-trip).
+/// Analog to `itk::AndImageFilter`.
+pub fn and_images<P, S1, S2>(s1: S1, s2: S2)
+    -> BinaryFilter<S1, S2, fn(P, P) -> P, P, P, P>
+where P: NumericPixel
+{
+    BinaryFilter::new(s1, s2, |a, b| {
+        let av = a.to_f64() as u64;
+        let bv = b.to_f64() as u64;
+        P::from_f64((av & bv) as f64)
+    })
+}
+
+/// Pixel-wise bitwise OR. Analog to `itk::OrImageFilter`.
+pub fn or_images<P, S1, S2>(s1: S1, s2: S2)
+    -> BinaryFilter<S1, S2, fn(P, P) -> P, P, P, P>
+where P: NumericPixel
+{
+    BinaryFilter::new(s1, s2, |a, b| {
+        let av = a.to_f64() as u64;
+        let bv = b.to_f64() as u64;
+        P::from_f64((av | bv) as f64)
+    })
+}
+
+/// Pixel-wise bitwise XOR. Analog to `itk::XorImageFilter`.
+pub fn xor_images<P, S1, S2>(s1: S1, s2: S2)
+    -> BinaryFilter<S1, S2, fn(P, P) -> P, P, P, P>
+where P: NumericPixel
+{
+    BinaryFilter::new(s1, s2, |a, b| {
+        let av = a.to_f64() as u64;
+        let bv = b.to_f64() as u64;
+        P::from_f64((av ^ bv) as f64)
+    })
+}
+
+/// Pixel-wise bitwise NOT (complement w.r.t. `maximum`).
+/// Analog to `itk::NotImageFilter`.
+pub struct NotFilter<S> {
+    pub source: S,
+    /// The maximum value (all bits set). For u8: 255, for u16: 65535, etc.
+    pub maximum: u64,
+}
+
+impl<S> NotFilter<S> {
+    pub fn new(source: S, maximum: u64) -> Self { Self { source, maximum } }
+}
+
+impl<P, S, const D: usize> ImageSource<P, D> for NotFilter<S>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let input = self.source.generate_region(requested);
+        let max = self.maximum;
+        let data: Vec<P> = input.data.par_iter()
+            .map(|&p| P::from_f64((max & !(p.to_f64() as u64)) as f64))
+            .collect();
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// N-ary filters (multiple images, same type)
+// ===========================================================================
+
+/// Add any number of images together. Analog to `itk::NaryAddImageFilter`.
+pub struct NaryAddFilter<P, const D: usize> {
+    pub sources: Vec<Box<dyn crate::source::ImageSource<P, D> + Send + Sync>>,
+}
+
+impl<P: NumericPixel, const D: usize> NaryAddFilter<P, D> {
+    pub fn new(sources: Vec<Box<dyn crate::source::ImageSource<P, D> + Send + Sync>>) -> Self {
+        Self { sources }
+    }
+}
+
+impl<P: NumericPixel, const D: usize> ImageSource<P, D> for NaryAddFilter<P, D> {
+    fn largest_region(&self) -> Region<D> {
+        self.sources.first().expect("at least one source").largest_region()
+    }
+    fn spacing(&self) -> [f64; D] { self.sources[0].spacing() }
+    fn origin(&self) -> [f64; D] { self.sources[0].origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let images: Vec<_> = self.sources.iter()
+            .map(|s| s.generate_region(requested))
+            .collect();
+        let len = images[0].data.len();
+        let mut data = vec![P::zero(); len];
+        for img in &images {
+            for (i, &p) in img.data.iter().enumerate() {
+                data[i] = data[i] + p;
+            }
+        }
+        Image { region: requested, spacing: images[0].spacing, origin: images[0].origin, data }
+    }
+}
+
+/// Pixelwise maximum over any number of images. Analog to `itk::NaryMaximumImageFilter`.
+pub struct NaryMaximumFilter<P, const D: usize> {
+    pub sources: Vec<Box<dyn crate::source::ImageSource<P, D> + Send + Sync>>,
+}
+
+impl<P: NumericPixel, const D: usize> NaryMaximumFilter<P, D> {
+    pub fn new(sources: Vec<Box<dyn crate::source::ImageSource<P, D> + Send + Sync>>) -> Self {
+        Self { sources }
+    }
+}
+
+impl<P: NumericPixel, const D: usize> ImageSource<P, D> for NaryMaximumFilter<P, D> {
+    fn largest_region(&self) -> Region<D> {
+        self.sources.first().expect("at least one source").largest_region()
+    }
+    fn spacing(&self) -> [f64; D] { self.sources[0].spacing() }
+    fn origin(&self) -> [f64; D] { self.sources[0].origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let images: Vec<_> = self.sources.iter()
+            .map(|s| s.generate_region(requested))
+            .collect();
+        let len = images[0].data.len();
+        let mut data = images[0].data.clone();
+        for img in &images[1..] {
+            for (i, &p) in img.data.iter().enumerate() {
+                if p.to_f64() > data[i].to_f64() { data[i] = p; }
+            }
+        }
+        Image { region: requested, spacing: images[0].spacing, origin: images[0].origin, data }
+    }
+}
+
+// ===========================================================================
+// Constrained value addition / difference
+// ===========================================================================
+
+/// `clamp(a + b, lower, upper)`. Analog to `itk::ConstrainedValueAdditionImageFilter`.
+pub struct ConstrainedValueAdditionFilter<S1, S2> {
+    pub source1: S1,
+    pub source2: S2,
+    pub lower: f64,
+    pub upper: f64,
+}
+
+impl<S1, S2> ConstrainedValueAdditionFilter<S1, S2> {
+    pub fn new(source1: S1, source2: S2, lower: f64, upper: f64) -> Self {
+        Self { source1, source2, lower, upper }
+    }
+}
+
+impl<P, S1, S2, const D: usize> ImageSource<P, D> for ConstrainedValueAdditionFilter<S1, S2>
+where
+    P: NumericPixel,
+    S1: ImageSource<P, D> + Sync,
+    S2: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source1.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source1.spacing() }
+    fn origin(&self) -> [f64; D] { self.source1.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let a = self.source1.generate_region(requested);
+        let b = self.source2.generate_region(requested);
+        let (lo, hi) = (self.lower, self.upper);
+        let data: Vec<P> = a.data.par_iter().zip(b.data.par_iter())
+            .map(|(&pa, &pb)| P::from_f64((pa.to_f64() + pb.to_f64()).clamp(lo, hi)))
+            .collect();
+        Image { region: requested, spacing: a.spacing, origin: a.origin, data }
+    }
+}
+
+/// `clamp(a − b, lower, upper)`. Analog to `itk::ConstrainedValueDifferenceImageFilter`.
+pub struct ConstrainedValueDifferenceFilter<S1, S2> {
+    pub source1: S1,
+    pub source2: S2,
+    pub lower: f64,
+    pub upper: f64,
+}
+
+impl<S1, S2> ConstrainedValueDifferenceFilter<S1, S2> {
+    pub fn new(source1: S1, source2: S2, lower: f64, upper: f64) -> Self {
+        Self { source1, source2, lower, upper }
+    }
+}
+
+impl<P, S1, S2, const D: usize> ImageSource<P, D> for ConstrainedValueDifferenceFilter<S1, S2>
+where
+    P: NumericPixel,
+    S1: ImageSource<P, D> + Sync,
+    S2: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source1.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source1.spacing() }
+    fn origin(&self) -> [f64; D] { self.source1.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let a = self.source1.generate_region(requested);
+        let b = self.source2.generate_region(requested);
+        let (lo, hi) = (self.lower, self.upper);
+        let data: Vec<P> = a.data.par_iter().zip(b.data.par_iter())
+            .map(|(&pa, &pb)| P::from_f64((pa.to_f64() - pb.to_f64()).clamp(lo, hi)))
+            .collect();
+        Image { region: requested, spacing: a.spacing, origin: a.origin, data }
+    }
+}
+
+// ===========================================================================
+// Vector pixel filters
+// ===========================================================================
+
+use crate::pixel::VecPixel;
+
+/// Compute the Euclidean magnitude of vector pixels.
+/// Analog to `itk::VectorMagnitudeImageFilter`.
+pub struct VectorMagnitudeFilter<S, T, const N: usize> {
+    pub source: S,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<S, T, const N: usize> VectorMagnitudeFilter<S, T, N> {
+    pub fn new(source: S) -> Self { Self { source, _phantom: std::marker::PhantomData } }
+}
+
+impl<T, S, const D: usize, const N: usize> ImageSource<T, D> for VectorMagnitudeFilter<S, T, N>
+where
+    T: NumericPixel,
+    S: ImageSource<VecPixel<T, N>, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<T, D> {
+        let input = self.source.generate_region(requested);
+        let data: Vec<T> = input.data.par_iter()
+            .map(|p| {
+                let mag2: f64 = p.0.iter().map(|c| { let v = c.to_f64(); v * v }).sum();
+                T::from_f64(mag2.sqrt())
+            })
+            .collect();
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+/// Extract one scalar component from vector pixels.
+/// Analog to `itk::VectorIndexSelectionCastImageFilter`.
+pub struct VectorIndexSelectionFilter<S, T, const N: usize> {
+    pub source: S,
+    pub index: usize,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<S, T, const N: usize> VectorIndexSelectionFilter<S, T, N> {
+    pub fn new(source: S, index: usize) -> Self {
+        Self { source, index, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<T, S, const D: usize, const N: usize> ImageSource<T, D>
+    for VectorIndexSelectionFilter<S, T, N>
+where
+    T: NumericPixel,
+    S: ImageSource<VecPixel<T, N>, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<T, D> {
+        let input = self.source.generate_region(requested);
+        let idx = self.index.min(N - 1);
+        let data: Vec<T> = input.data.par_iter()
+            .map(|p| p.0[idx])
+            .collect();
+        Image { region: requested, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+/// Compose two scalar images into a `VecPixel<T, 2>` image.
+/// Analog to `itk::ComposeImageFilter` for 2-component output.
+pub struct Compose2Filter<S1, S2, T> {
+    pub source1: S1,
+    pub source2: S2,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<S1, S2, T> Compose2Filter<S1, S2, T> {
+    pub fn new(source1: S1, source2: S2) -> Self {
+        Self { source1, source2, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<T, S1, S2, const D: usize> ImageSource<VecPixel<T, 2>, D> for Compose2Filter<S1, S2, T>
+where
+    T: NumericPixel,
+    S1: ImageSource<T, D> + Sync,
+    S2: ImageSource<T, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source1.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source1.spacing() }
+    fn origin(&self) -> [f64; D] { self.source1.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<VecPixel<T, 2>, D> {
+        let a = self.source1.generate_region(requested);
+        let b = self.source2.generate_region(requested);
+        let data: Vec<VecPixel<T, 2>> = a.data.par_iter().zip(b.data.par_iter())
+            .map(|(&pa, &pb)| VecPixel([pa, pb]))
+            .collect();
+        Image { region: requested, spacing: a.spacing, origin: a.origin, data }
+    }
+}
+
+/// Compose three scalar images into a `VecPixel<T, 3>` image.
+/// Analog to `itk::ComposeImageFilter` for 3-component output.
+pub struct Compose3Filter<S1, S2, S3, T> {
+    pub source1: S1,
+    pub source2: S2,
+    pub source3: S3,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<S1, S2, S3, T> Compose3Filter<S1, S2, S3, T> {
+    pub fn new(source1: S1, source2: S2, source3: S3) -> Self {
+        Self { source1, source2, source3, _phantom: std::marker::PhantomData }
+    }
+}
+
+impl<T, S1, S2, S3, const D: usize> ImageSource<VecPixel<T, 3>, D>
+    for Compose3Filter<S1, S2, S3, T>
+where
+    T: NumericPixel,
+    S1: ImageSource<T, D> + Sync,
+    S2: ImageSource<T, D> + Sync,
+    S3: ImageSource<T, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source1.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source1.spacing() }
+    fn origin(&self) -> [f64; D] { self.source1.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<VecPixel<T, 3>, D> {
+        let a = self.source1.generate_region(requested);
+        let b = self.source2.generate_region(requested);
+        let c = self.source3.generate_region(requested);
+        let data: Vec<VecPixel<T, 3>> = a.data.par_iter()
+            .zip(b.data.par_iter())
+            .zip(c.data.par_iter())
+            .map(|((&pa, &pb), &pc)| VecPixel([pa, pb, pc]))
+            .collect();
+        Image { region: requested, spacing: a.spacing, origin: a.origin, data }
+    }
+}
+
+// ===========================================================================
+// Histogram matching filter
+// ===========================================================================
+
+/// Match the histogram of `source` to that of a `reference` image.
+/// Analog to `itk::HistogramMatchingImageFilter`.
+///
+/// Computes empirical CDFs from both images and applies the piecewise-linear
+/// mapping that transfers `source` intensities to match the reference CDF.
+pub struct HistogramMatchingFilter<S, R> {
+    pub source: S,
+    pub reference: R,
+    pub num_bins: usize,
+}
+
+impl<S, R> HistogramMatchingFilter<S, R> {
+    pub fn new(source: S, reference: R) -> Self {
+        Self { source, reference, num_bins: 256 }
+    }
+    pub fn with_num_bins(mut self, n: usize) -> Self { self.num_bins = n; self }
+}
+
+impl<P, S, R, const D: usize> ImageSource<P, D> for HistogramMatchingFilter<S, R>
+where
+    P: NumericPixel,
+    S: ImageSource<P, D> + Sync,
+    R: ImageSource<P, D> + Sync,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+    fn input_region_for_output(&self, _: &Region<D>) -> Region<D> {
+        self.source.largest_region()
+    }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<P, D> {
+        let src_full = self.source.generate_region(self.source.largest_region());
+        let ref_full = self.reference.generate_region(self.reference.largest_region());
+
+        let nb = self.num_bins;
+
+        // Helper: build cumulative distribution function from image data
+        let build_cdf = |data: &[P]| -> (f64, f64, Vec<f64>) {
+            let (imin, imax) = data.iter().fold((f64::MAX, f64::MIN), |(mn, mx), &p| {
+                let v = p.to_f64(); (mn.min(v), mx.max(v))
+            });
+            let range = imax - imin;
+            let mut hist = vec![0u64; nb];
+            for &p in data {
+                let v = p.to_f64();
+                let bin = if range < 1e-15 { 0 }
+                    else { ((v - imin) / range * nb as f64) as usize }.min(nb - 1);
+                hist[bin] += 1;
+            }
+            let total = data.len() as f64;
+            let mut cdf = vec![0.0f64; nb];
+            let mut acc = 0.0f64;
+            for i in 0..nb {
+                acc += hist[i] as f64 / total;
+                cdf[i] = acc;
+            }
+            (imin, imax, cdf)
+        };
+
+        let (src_min, src_max, src_cdf) = build_cdf(&src_full.data);
+        let (ref_min, ref_max, ref_cdf) = build_cdf(&ref_full.data);
+
+        // Build intensity-to-intensity LUT: for each source intensity, find the reference
+        // intensity that has the same CDF value
+        let lut: Vec<f64> = (0..nb).map(|i| {
+            let src_intensity = src_min + (i as f64 + 0.5) / nb as f64 * (src_max - src_min);
+            let cdf_val = src_cdf[i];
+            // Find bin in reference CDF with matching value
+            let ref_bin = ref_cdf.partition_point(|&c| c < cdf_val).min(nb - 1);
+            ref_min + (ref_bin as f64 + 0.5) / nb as f64 * (ref_max - ref_min)
+        }).collect();
+
+        let mut out_indices: Vec<Index<D>> = Vec::with_capacity(requested.linear_len());
+        iter_region(&requested, |idx| out_indices.push(idx));
+
+        let src_range = src_max - src_min;
+        let data: Vec<P> = out_indices.par_iter()
+            .map(|&idx| {
+                let v = src_full.get_pixel(idx).to_f64();
+                let bin = if src_range < 1e-15 { 0 }
+                    else { ((v - src_min) / src_range * nb as f64) as usize }.min(nb - 1);
+                P::from_f64(lut[bin])
+            })
+            .collect();
+        Image { region: requested, spacing: self.source.spacing(), origin: self.source.origin(), data }
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

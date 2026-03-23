@@ -86,6 +86,12 @@ pub struct Image<P, const D: usize> {
     pub data: Vec<P>,
 }
 
+impl<P: Clone, const D: usize> Clone for Image<P, D> {
+    fn clone(&self) -> Self {
+        Self { region: self.region, spacing: self.spacing, origin: self.origin, data: self.data.clone() }
+    }
+}
+
 impl<P: Clone + Default, const D: usize> Image<P, D> {
     /// Allocate a new image filled with `fill`.
     pub fn allocate(
