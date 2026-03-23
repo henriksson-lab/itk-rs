@@ -550,6 +550,90 @@ where
     }
 }
 
+// ===========================================================================
+// PatchBasedDenoisingImageFilter
+// ===========================================================================
+
+/// Patch-based non-local means denoising.
+/// Analog to `itk::PatchBasedDenoisingImageFilter`.
+pub struct PatchBasedDenoisingFilter<S> {
+    pub source: S,
+    pub patch_radius: usize,
+    pub search_radius: usize,
+    pub h: f64,
+    pub iterations: usize,
+}
+
+impl<S> PatchBasedDenoisingFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, patch_radius: 1, search_radius: 5, h: 10.0, iterations: 2 }
+    }
+}
+
+impl<S> ImageSource<f32, 2> for PatchBasedDenoisingFilter<S>
+where
+    S: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h_dim] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+        let pr = self.patch_radius as i64;
+        let sr = self.search_radius as i64;
+        let h2 = self.h * self.h;
+
+        let flat = |x: i64, y: i64| -> usize {
+            let xi = (x - ox).clamp(0, w as i64 - 1) as usize;
+            let yi = (y - oy).clamp(0, h_dim as i64 - 1) as usize;
+            yi * w + xi
+        };
+
+        let patch_dist = |cx: i64, cy: i64, nx: i64, ny: i64| -> f64 {
+            let mut d = 0.0f64;
+            let mut cnt = 0;
+            for dy in -pr..=pr {
+                for dx in -pr..=pr {
+                    let v1 = input.data[flat(cx + dx, cy + dy)] as f64;
+                    let v2 = input.data[flat(nx + dx, ny + dy)] as f64;
+                    d += (v1 - v2) * (v1 - v2);
+                    cnt += 1;
+                }
+            }
+            d / cnt as f64
+        };
+
+        let mut output = vec![0.0f32; w * h_dim];
+        for _ in 0..self.iterations {
+            for y in 0..h_dim {
+                for x in 0..w {
+                    let cx = ox + x as i64; let cy = oy + y as i64;
+                    let mut weight_sum = 0.0f64;
+                    let mut val_sum = 0.0f64;
+                    let x0 = (x as i64 - sr).max(0) as usize;
+                    let x1 = (x as i64 + sr).min(w as i64 - 1) as usize;
+                    let y0 = (y as i64 - sr).max(0) as usize;
+                    let y1 = (y as i64 + sr).min(h_dim as i64 - 1) as usize;
+                    for ny in y0..=y1 {
+                        for nx in x0..=x1 {
+                            let nnx = ox + nx as i64; let nny = oy + ny as i64;
+                            let d = patch_dist(cx, cy, nnx, nny);
+                            let w_nl = (-d / h2).exp();
+                            weight_sum += w_nl;
+                            val_sum += w_nl * input.data[ny * w + nx] as f64;
+                        }
+                    }
+                    output[y * w + x] = (val_sum / weight_sum.max(1e-10)) as f32;
+                }
+            }
+        }
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data: output }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

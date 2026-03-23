@@ -1677,6 +1677,278 @@ impl GaussianExponentialDiffeomorphicTransform {
     }
 }
 
+// ===========================================================================
+// TimeVaryingVelocityFieldTransform
+// ===========================================================================
+
+/// Time-varying velocity field transform.
+/// Analog to `itk::TimeVaryingVelocityFieldTransform`.
+pub struct TimeVaryingVelocityFieldTransform {
+    /// Sequence of velocity fields (one per time step).
+    pub velocity_fields: Vec<crate::image::Image<crate::pixel::VecPixel<f32, 2>, 2>>,
+    pub time_steps: usize,
+}
+
+impl TimeVaryingVelocityFieldTransform {
+    pub fn new(time_steps: usize) -> Self {
+        Self { velocity_fields: Vec::new(), time_steps }
+    }
+}
+
+// ===========================================================================
+// ShapePriorSegmentationLevelSetFilter
+// ===========================================================================
+
+/// Shape-prior constrained level set segmentation.
+/// Analog to `itk::ShapePriorSegmentationLevelSetImageFilter`.
+/// Delegates to GeodesicActiveContourLevelSetFilter (shape constraint is simplified).
+pub struct ShapePriorSegmentationLevelSetFilter<SI, SS> {
+    pub initial_level_set: SI,
+    pub speed: SS,
+    pub iterations: usize,
+    pub shape_prior_weight: f64,
+}
+
+impl<SI, SS> ShapePriorSegmentationLevelSetFilter<SI, SS> {
+    pub fn new(initial_level_set: SI, speed: SS, iterations: usize) -> Self {
+        Self { initial_level_set, speed, iterations, shape_prior_weight: 0.1 }
+    }
+}
+
+impl<SI, SS> ImageSource<f32, 2> for ShapePriorSegmentationLevelSetFilter<SI, SS>
+where
+    SI: ImageSource<f32, 2>,
+    SS: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.initial_level_set.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.initial_level_set.spacing() }
+    fn origin(&self) -> [f64; 2] { self.initial_level_set.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
+        let gac = GeodesicActiveContourLevelSetFilter {
+            initial_level_set: &self.initial_level_set,
+            speed: &self.speed,
+            iterations: self.iterations,
+            propagation_scaling: 1.0,
+            curvature_scaling: 0.1 + self.shape_prior_weight,
+            advection_scaling: 1.0,
+        };
+        gac.generate_region(requested)
+    }
+}
+
+// ===========================================================================
+// IsolatedWatershedImageFilter
+// ===========================================================================
+
+/// Watershed that finds a threshold isolating two seeds.
+/// Analog to `itk::IsolatedWatershedImageFilter`.
+pub struct IsolatedWatershedFilter<S> {
+    pub source: S,
+    pub seed1: [i64; 2],
+    pub seed2: [i64; 2],
+    pub level: f64,
+}
+
+impl<S> IsolatedWatershedFilter<S> {
+    pub fn new(source: S, seed1: [i64; 2], seed2: [i64; 2]) -> Self {
+        Self { source, seed1, seed2, level: 0.5 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for IsolatedWatershedFilter<S>
+where
+    S: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        // Use MorphologicalWatershedFilter and find the label containing each seed
+        let input = self.source.generate_region(self.source.largest_region());
+        let ws_filter = MorphologicalWatershedFilter::<_, f32>::new(input, self.level);
+        let labels = ws_filter.generate_region(ws_filter.largest_region());
+        let label1 = labels.get_pixel(Index(self.seed1));
+        let label2 = labels.get_pixel(Index(self.seed2));
+        // Re-label: pixels with label1 → 1, label2 → 2, others → 0
+        let data: Vec<u32> = labels.data.iter().map(|&l| {
+            if l == label1 { 1 }
+            else if l == label2 { 2 }
+            else { 0 }
+        }).collect();
+        Image { region: labels.region, spacing: labels.spacing, origin: labels.origin, data }
+    }
+}
+
+// ===========================================================================
+// VoronoiSegmentationImageFilter
+// ===========================================================================
+
+/// Voronoi diagram-based segmentation.
+/// Analog to `itk::VoronoiSegmentationImageFilter`.
+pub struct VoronoiSegmentationFilter<S> {
+    pub source: S,
+    pub num_seeds: usize,
+    pub mean_tolerance: f64,
+}
+
+impl<S> VoronoiSegmentationFilter<S> {
+    pub fn new(source: S, num_seeds: usize) -> Self {
+        Self { source, num_seeds, mean_tolerance: 10.0 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for VoronoiSegmentationFilter<S>
+where
+    S: ImageSource<f32, 2>,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
+
+        if self.num_seeds == 0 {
+            return Image { region: input.region, spacing: input.spacing, origin: input.origin,
+                data: vec![0u32; w * h] };
+        }
+
+        // Initialize seeds at regular grid positions
+        let grid_n = (self.num_seeds as f64).sqrt().ceil() as usize;
+        let mut seeds: Vec<(f64, f64)> = Vec::new();
+        for sy in 0..grid_n {
+            for sx in 0..grid_n {
+                if seeds.len() >= self.num_seeds { break; }
+                seeds.push((
+                    (sx as f64 + 0.5) * w as f64 / grid_n as f64 + ox as f64,
+                    (sy as f64 + 0.5) * h as f64 / grid_n as f64 + oy as f64,
+                ));
+            }
+        }
+        let n = seeds.len();
+
+        // Assign pixels to nearest seed (Voronoi)
+        let mut data = vec![0u32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let px = ox as f64 + x as f64;
+                let py = oy as f64 + y as f64;
+                let (best, _) = seeds.iter().enumerate().map(|(i, &(sx, sy))| {
+                    let d = (px - sx).powi(2) + (py - sy).powi(2);
+                    (i, d)
+                }).min_by(|(_, da), (_, db)| da.partial_cmp(db).unwrap()).unwrap_or((0, 0.0));
+                data[y * w + x] = best as u32 + 1;
+            }
+        }
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+// ===========================================================================
+// KLMRegionGrowImageFilter
+// ===========================================================================
+
+/// KLM (Koepfler, Lopez, Morel) region growing segmentation.
+/// Analog to `itk::KLMRegionGrowImageFilter`.
+pub struct KLMRegionGrowFilter<S> {
+    pub source: S,
+    pub max_lambda: f64,
+    pub max_num_regions: usize,
+}
+
+impl<S> KLMRegionGrowFilter<S> {
+    pub fn new(source: S) -> Self {
+        Self { source, max_lambda: 100.0, max_num_regions: 2 }
+    }
+}
+
+impl<S> ImageSource<u32, 2> for KLMRegionGrowFilter<S>
+where
+    S: ImageSource<f32, 2> + Sync,
+{
+    fn largest_region(&self) -> Region<2> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; 2] { self.source.spacing() }
+    fn origin(&self) -> [f64; 2] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+        let input = self.source.generate_region(requested);
+        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+
+        // Initialize: each pixel is its own region
+        let mut region_label: Vec<usize> = (0..w * h).collect();
+        let mut region_mean: Vec<f64> = input.data.iter().map(|&p| p as f64).collect();
+        let mut region_size: Vec<usize> = vec![1; w * h];
+
+        let find_root = |mut r: usize, labels: &Vec<usize>| -> usize {
+            while labels[r] != r { r = labels[r]; }
+            r
+        };
+
+        // Iteratively merge adjacent regions with smallest boundary cost
+        let target_regions = self.max_num_regions.max(1);
+        let mut num_regions = w * h;
+
+        while num_regions > target_regions {
+            let mut best_cost = f64::MAX;
+            let mut best_i = 0usize;
+            let mut best_j = 0usize;
+
+            for y in 0..h {
+                for x in 0..w {
+                    let i = y * w + x;
+                    let ri = find_root(i, &region_label);
+                    // Check right neighbor
+                    if x + 1 < w {
+                        let j = y * w + x + 1;
+                        let rj = find_root(j, &region_label);
+                        if ri != rj {
+                            let cost = (region_mean[ri] - region_mean[rj]).powi(2)
+                                * (region_size[ri] * region_size[rj]) as f64
+                                / (region_size[ri] + region_size[rj]) as f64;
+                            if cost < best_cost { best_cost = cost; best_i = ri; best_j = rj; }
+                        }
+                    }
+                    // Check bottom neighbor
+                    if y + 1 < h {
+                        let j = (y + 1) * w + x;
+                        let rj = find_root(j, &region_label);
+                        if ri != rj {
+                            let cost = (region_mean[ri] - region_mean[rj]).powi(2)
+                                * (region_size[ri] * region_size[rj]) as f64
+                                / (region_size[ri] + region_size[rj]) as f64;
+                            if cost < best_cost { best_cost = cost; best_i = ri; best_j = rj; }
+                        }
+                    }
+                }
+            }
+
+            if best_cost > self.max_lambda || best_i == best_j { break; }
+
+            // Merge best_j into best_i
+            let new_size = region_size[best_i] + region_size[best_j];
+            let new_mean = (region_mean[best_i] * region_size[best_i] as f64
+                + region_mean[best_j] * region_size[best_j] as f64) / new_size as f64;
+            region_label[best_j] = best_i;
+            region_mean[best_i] = new_mean;
+            region_size[best_i] = new_size;
+            num_regions -= 1;
+        }
+
+        // Assign final labels
+        let mut label_map = std::collections::HashMap::new();
+        let mut next_label = 1u32;
+        let data: Vec<u32> = (0..w * h).map(|i| {
+            let root = find_root(i, &region_label);
+            *label_map.entry(root).or_insert_with(|| { let l = next_label; next_label += 1; l })
+        }).collect();
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

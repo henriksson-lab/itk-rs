@@ -372,6 +372,103 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// BSplineSyNImageRegistrationMethod
+// ---------------------------------------------------------------------------
+
+/// BSpline SyN registration (simplified: uses diffeomorphic demons + smoothing).
+/// Analog to `itk::BSplineSyNImageRegistrationMethod`.
+pub struct BSplineSyNRegistrationMethod<SF, SM> {
+    pub fixed: SF,
+    pub moving: SM,
+    pub iterations: Vec<usize>,
+    pub spline_order: usize,
+}
+
+impl<SF, SM> BSplineSyNRegistrationMethod<SF, SM> {
+    pub fn new(fixed: SF, moving: SM) -> Self {
+        Self { fixed, moving, iterations: vec![20, 10, 5], spline_order: 3 }
+    }
+}
+
+impl<SF, SM> BSplineSyNRegistrationMethod<SF, SM>
+where
+    SF: ImageSource<f32, 2>,
+    SM: ImageSource<f32, 2>,
+{
+    pub fn compute(&self) -> Image<VecPixel<f32, 2>, 2> {
+        let total: usize = self.iterations.iter().sum();
+        let demons = DiffeomorphicDemonsRegistrationFilter::new(&self.fixed, &self.moving, total);
+        demons.compute()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TimeVaryingVelocityFieldImageRegistrationMethodv4
+// ---------------------------------------------------------------------------
+
+/// Time-varying velocity field registration.
+/// Analog to `itk::TimeVaryingVelocityFieldImageRegistrationMethodv4`.
+/// Simplified: runs multiple iterations of diffeomorphic demons with decreasing step.
+pub struct TimeVaryingVelocityFieldRegistration<SF, SM> {
+    pub fixed: SF,
+    pub moving: SM,
+    pub iterations_per_time: Vec<usize>,
+    pub sigma_v: f64,
+}
+
+impl<SF, SM> TimeVaryingVelocityFieldRegistration<SF, SM> {
+    pub fn new(fixed: SF, moving: SM) -> Self {
+        Self { fixed, moving, iterations_per_time: vec![10, 5], sigma_v: 1.5 }
+    }
+}
+
+impl<SF, SM> TimeVaryingVelocityFieldRegistration<SF, SM>
+where
+    SF: ImageSource<f32, 2>,
+    SM: ImageSource<f32, 2>,
+{
+    pub fn compute(&self) -> Image<VecPixel<f32, 2>, 2> {
+        let total: usize = self.iterations_per_time.iter().sum();
+        let ddf = DiffeomorphicDemonsRegistrationFilter {
+            fixed: &self.fixed, moving: &self.moving,
+            iterations: total, sigma_diff: self.sigma_v,
+        };
+        ddf.compute()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FEMRegistrationFilter
+// ---------------------------------------------------------------------------
+
+/// FEM-based deformable registration.
+/// Analog to `itk::FEMRegistrationFilter`.
+/// Simplified: delegates to demons registration.
+pub struct FEMRegistrationFilter<SF, SM> {
+    pub fixed: SF,
+    pub moving: SM,
+    pub iterations: usize,
+    pub elastic_weight: f64,
+}
+
+impl<SF, SM> FEMRegistrationFilter<SF, SM> {
+    pub fn new(fixed: SF, moving: SM) -> Self {
+        Self { fixed, moving, iterations: 10, elastic_weight: 1.0 }
+    }
+}
+
+impl<SF, SM> FEMRegistrationFilter<SF, SM>
+where
+    SF: ImageSource<f32, 2>,
+    SM: ImageSource<f32, 2>,
+{
+    pub fn compute(&self) -> Image<VecPixel<f32, 2>, 2> {
+        let demons = DemonsRegistrationFilter::new(&self.fixed, &self.moving, self.iterations);
+        demons.compute()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

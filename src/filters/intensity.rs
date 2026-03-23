@@ -1222,6 +1222,100 @@ where
 }
 
 // ===========================================================================
+// MagnitudeAndPhaseToComplexImageFilter
+// ===========================================================================
+
+/// Combine magnitude + phase images into a complex image.
+/// Analog to `itk::MagnitudeAndPhaseToComplexImageFilter`.
+pub struct MagnitudeAndPhaseToComplexFilter<SM, SP> {
+    pub magnitude: SM,
+    pub phase: SP,
+}
+
+impl<SM, SP> MagnitudeAndPhaseToComplexFilter<SM, SP> {
+    pub fn new(magnitude: SM, phase: SP) -> Self { Self { magnitude, phase } }
+}
+
+impl<SM, SP, const D: usize> ImageSource<[f32; 2], D> for MagnitudeAndPhaseToComplexFilter<SM, SP>
+where
+    SM: ImageSource<f32, D>,
+    SP: ImageSource<f32, D>,
+{
+    fn largest_region(&self) -> Region<D> { self.magnitude.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.magnitude.spacing() }
+    fn origin(&self) -> [f64; D] { self.magnitude.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<[f32; 2], D> {
+        let mag = self.magnitude.generate_region(requested);
+        let phase = self.phase.generate_region(requested);
+        let data: Vec<[f32; 2]> = mag.data.iter().zip(phase.data.iter()).map(|(&m, &p)| {
+            let re = m * p.cos();
+            let im = m * p.sin();
+            [re, im]
+        }).collect();
+        Image { region: mag.region, spacing: mag.spacing, origin: mag.origin, data }
+    }
+}
+
+// ===========================================================================
+// ScalarToRGBPixelFilter
+// ===========================================================================
+
+/// Map a scalar value to an RGB pixel via a simple hue-based colormap.
+/// Analog to `itk::ScalarToRGBPixelFunctor`.
+/// Output pixel is `[f32; 3]` = [R, G, B] in [0, 1].
+pub struct ScalarToRGBPixelFilter<S> {
+    pub source: S,
+    pub min_value: f64,
+    pub max_value: f64,
+}
+
+impl<S> ScalarToRGBPixelFilter<S> {
+    pub fn new(source: S, min_value: f64, max_value: f64) -> Self {
+        Self { source, min_value, max_value }
+    }
+}
+
+impl<S, const D: usize> ImageSource<[f32; 3], D> for ScalarToRGBPixelFilter<S>
+where
+    S: ImageSource<f32, D>,
+{
+    fn largest_region(&self) -> Region<D> { self.source.largest_region() }
+    fn spacing(&self) -> [f64; D] { self.source.spacing() }
+    fn origin(&self) -> [f64; D] { self.source.origin() }
+
+    fn generate_region(&self, requested: Region<D>) -> Image<[f32; 3], D> {
+        let input = self.source.generate_region(requested);
+        let range = (self.max_value - self.min_value).max(1e-10);
+        let data: Vec<[f32; 3]> = input.data.iter().map(|&p| {
+            let t = ((p as f64 - self.min_value) / range).clamp(0.0, 1.0) as f32;
+            // HSV hue rotation: 0 → blue, 0.5 → green, 1 → red
+            let h = (1.0 - t) * 2.0 / 3.0 * 360.0;
+            let (r, g, b) = hsv_to_rgb(h, 1.0, 1.0);
+            [r, g, b]
+        }).collect();
+        Image { region: input.region, spacing: input.spacing, origin: input.origin, data }
+    }
+}
+
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
+    let h = h % 360.0;
+    let i = (h / 60.0) as i32;
+    let f = h / 60.0 - i as f32;
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - s * f);
+    let t = v * (1.0 - s * (1.0 - f));
+    match i % 6 {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    }
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

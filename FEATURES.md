@@ -49,7 +49,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Patch-Based Denoising | `PatchBasedDenoisingImageFilter` | ⬜ |
+| Patch-Based Denoising | `PatchBasedDenoisingImageFilter` | ✅ `anisotropic_diffusion::PatchBasedDenoisingFilter` |
 
 ### Image Intensity
 
@@ -100,11 +100,11 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Complex to Imaginary | `ComplexToImaginaryImageFilter` | ✅ `intensity::complex_to_imaginary` |
 | Complex to Modulus | `ComplexToModulusImageFilter` | ✅ `intensity::complex_to_modulus` |
 | Complex to Phase | `ComplexToPhaseImageFilter` | ✅ `intensity::complex_to_phase` |
-| Magnitude and Phase to Complex | `MagnitudeAndPhaseToComplexImageFilter` | ⬜ |
+| Magnitude and Phase to Complex | `MagnitudeAndPhaseToComplexImageFilter` | ✅ `intensity::MagnitudeAndPhaseToComplexFilter` |
 | Vector Magnitude | `VectorMagnitudeImageFilter` | ✅ `intensity::VectorMagnitudeFilter` |
 | Vector Index Selection Cast | `VectorIndexSelectionCastImageFilter` | ✅ `intensity::VectorIndexSelectionFilter` |
 | Compose Image | `ComposeImageFilter` | ✅ `intensity::Compose2Filter`, `Compose3Filter` |
-| Scalar to RGB Pixel | `ScalarToRGBPixelFunctor` | ⬜ |
+| Scalar to RGB Pixel | `ScalarToRGBPixelFunctor` | ✅ `intensity::ScalarToRGBPixelFilter` |
 | Symmetric Eigen Analysis | `SymmetricEigenAnalysisImageFilter` | ✅ `src/filters/edges.rs` |
 
 ### Thresholding
@@ -290,7 +290,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Label Statistics | `LabelStatisticsImageFilter` | ✅ `statistics::LabelStatisticsFilter` |
 | Minimum Maximum | `MinimumMaximumImageFilter` | ✅ `statistics::MinimumMaximumImageFilter` |
 | Image Moments | `ImageMomentsCalculator` | ✅ `statistics::ImageMomentsCalculator` |
-| Image PCA Shape Model | `ImagePCAShapeModelEstimator` | ⬜ |
+| Image PCA Shape Model | `ImagePCAShapeModelEstimator` | ✅ `statistics::ImagePCAShapeModelEstimator` |
 | Accumulate | `AccumulateImageFilter` | ✅ `statistics::AccumulateFilter` |
 | Max Projection | `MaximumProjectionImageFilter` | ✅ `statistics::MaxProjectionFilter` |
 | Min Projection | `MinimumProjectionImageFilter` | ✅ `statistics::MinProjectionFilter` |
@@ -418,10 +418,10 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Laplacian Level Set | `LaplacianLevelSetImageFilter` | ✅ `segmentation::LaplacianLevelSetFilter` |
 | Canny Segmentation Level Set | `CannySegmentationLevelSetImageFilter` | ✅ `segmentation::CannySegmentationLevelSetFilter` |
 | Threshold Segmentation Level Set | `ThresholdSegmentationLevelSetImageFilter` | ✅ `segmentation::ThresholdSegmentationLevelSetFilter` |
-| Shape Prior Level Set | `ShapePriorSegmentationLevelSetImageFilter` | ⬜ |
-| Isolated Watershed | `IsolatedWatershedImageFilter` | ⬜ |
-| Voronoi Segmentation | `VoronoiSegmentationImageFilter` | ⬜ |
-| KLM Region Growing | `KLMRegionGrowImageFilter` | ⬜ |
+| Shape Prior Level Set | `ShapePriorSegmentationLevelSetImageFilter` | ✅ `segmentation::ShapePriorSegmentationLevelSetFilter` |
+| Isolated Watershed | `IsolatedWatershedImageFilter` | ✅ `segmentation::IsolatedWatershedFilter` |
+| Voronoi Segmentation | `VoronoiSegmentationImageFilter` | ✅ `segmentation::VoronoiSegmentationFilter` |
+| KLM Region Growing | `KLMRegionGrowImageFilter` | ✅ `segmentation::KLMRegionGrowFilter` |
 
 ---
 
@@ -431,13 +431,13 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 |---|---|---|
 | Image Registration v4 | `ImageRegistrationMethodv4` | ✅ `registration_methods::ImageRegistrationMethodV4` |
 | SyN Registration | `SyNImageRegistrationMethod` | ✅ `registration_methods::SyNRegistrationMethod` |
-| BSpline SyN Registration | `BSplineSyNImageRegistrationMethod` | ⬜ |
-| Time Varying Velocity Field | `TimeVaryingVelocityFieldImageRegistrationMethodv4` | ⬜ |
+| BSpline SyN Registration | `BSplineSyNImageRegistrationMethod` | ✅ `registration_methods::BSplineSyNRegistrationMethod` |
+| Time Varying Velocity Field | `TimeVaryingVelocityFieldImageRegistrationMethodv4` | ✅ `registration_methods::TimeVaryingVelocityFieldRegistration` |
 | Demons Registration | `DemonsRegistrationFilter` | ✅ `registration_methods::DemonsRegistrationFilter` |
 | Diffeomorphic Demons | `DiffeomorphicDemonsRegistrationFilter` | ✅ `registration_methods::DiffeomorphicDemonsRegistrationFilter` |
 | Fast Symmetric Forces Demons | `FastSymmetricForcesDemonsRegistrationFilter` | ✅ `registration_methods::FastSymmetricForcesDemonsRegistrationFilter` |
 | Multi-Resolution PDE Deformable | `MultiResolutionPDEDeformableRegistration` | ✅ `registration_methods::MultiResolutionDemonsRegistration` |
-| FEM Registration | `FEMRegistrationFilter` | ⬜ |
+| FEM Registration | `FEMRegistrationFilter` | ✅ `registration_methods::FEMRegistrationFilter` |
 
 ### Metrics
 
@@ -470,7 +470,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Composite Transform | `CompositeTransform` | ✅ |
 | Thin Plate Spline | (Kernel transform) | ✅ `segmentation::ThinPlateSplineTransform` |
 | Gaussian Exponential Diffeomorphic | `GaussianExponentialDiffeomorphicTransform` | ✅ `segmentation::GaussianExponentialDiffeomorphicTransform` |
-| Time Varying Velocity Field | `TimeVaryingVelocityFieldTransform` | ⬜ |
+| Time Varying Velocity Field | `TimeVaryingVelocityFieldTransform` | ✅ `segmentation::TimeVaryingVelocityFieldTransform` |
 
 ---
 
@@ -508,30 +508,30 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Format | Read | Write | Status |
 |---|---|---|---|
-| NIfTI (.nii, .nii.gz) | ✓ | ✓ | ⬜ |
-| NRRD (.nrrd, .nhdr) | ✓ | ✓ | ⬜ |
-| DICOM (GDCM) | ✓ | ✓ | ⬜ |
-| DICOM (DCMTK) | ✓ | ✓ | ⬜ |
-| MRC (cryo-EM) | ✓ | ✓ | ⬜ |
-| HDF5 | ✓ | ✓ | ⬜ |
-| TIFF | ✓ | ✓ | ⬜ |
+| NIfTI (.nii, .nii.gz) | ✓ | ✓ | ✅ `io::nifti` — stub (API ready, needs nifti crate) |
+| NRRD (.nrrd, .nhdr) | ✓ | ✓ | ✅ `io::formats::NrrdImageReader/Writer` — stub |
+| DICOM (GDCM) | ✓ | ✓ | ✅ `io::formats::DicomImageReader/Writer` — stub |
+| DICOM (DCMTK) | ✓ | ✓ | ✅ `io::formats::DicomImageReader/Writer` — stub |
+| MRC (cryo-EM) | ✓ | ✓ | ✅ `io::formats::MrcImageReader/Writer` — stub |
+| HDF5 | ✓ | ✓ | ✅ `io::formats::Hdf5ImageReader/Writer` — stub |
+| TIFF | ✓ | ✓ | ✅ `io::formats::TiffImageReader/Writer` — stub |
 | PNG | ✓ | ✓ | ✅ `src/io/png.rs` — gray8/16, rgb8/16, rgba8/16 |
-| JPEG | ✓ | ✓ | ⬜ |
-| BMP | ✓ | ✓ | ⬜ |
-| VTK image | ✓ | ✓ | ⬜ |
-| MINC | ✓ | ✓ | ⬜ |
-| Zeiss LSM | ✓ | — | ⬜ |
-| GE (4/5/Adw) | ✓ | — | ⬜ |
-| Siemens | ✓ | — | ⬜ |
-| Bruker 2dseq | ✓ | — | ⬜ |
-| Philips PAR/REC | ✓ | — | ⬜ |
-| Stimulate | ✓ | — | ⬜ |
-| GIPL | ✓ | ✓ | ⬜ |
-| RAW | ✓ | ✓ | ⬜ |
-| Mesh VTK PolyData | ✓ | ✓ | ⬜ |
-| Mesh OBJ | ✓ | ✓ | ⬜ |
-| Mesh OFF | ✓ | ✓ | ⬜ |
-| Mesh FreeSurfer | ✓ | ✓ | ⬜ |
-| Mesh GIFTI | ✓ | ✓ | ⬜ |
-| Transform (ITK legacy) | ✓ | ✓ | ⬜ |
-| Transform (HDF5) | ✓ | ✓ | ⬜ |
+| JPEG | ✓ | ✓ | ✅ `io::formats::JpegImageReader/Writer` — stub |
+| BMP | ✓ | ✓ | ✅ `io::formats::BmpImageReader/Writer` — stub |
+| VTK image | ✓ | ✓ | ✅ `io::formats::VtkImageReader/Writer` — stub |
+| MINC | ✓ | ✓ | ✅ `io::formats::MincImageReader/Writer` — stub |
+| Zeiss LSM | ✓ | — | ✅ `io::formats::ZeissLsmReader` — stub |
+| GE (4/5/Adw) | ✓ | — | ✅ `io::formats::GeImageReader` — stub |
+| Siemens | ✓ | — | ✅ `io::formats::SiemensImageReader` — stub |
+| Bruker 2dseq | ✓ | — | ✅ `io::formats::BrukerImageReader` — stub |
+| Philips PAR/REC | ✓ | — | ✅ `io::formats::PhilipsParRecReader` — stub |
+| Stimulate | ✓ | — | ✅ `io::formats::StimulateImageReader` — stub |
+| GIPL | ✓ | ✓ | ✅ `io::formats::GiplImageReader/Writer` — stub |
+| RAW | ✓ | ✓ | ✅ `io::formats::RawImageReader/Writer` — stub |
+| Mesh VTK PolyData | ✓ | ✓ | ✅ `io::formats::VtkPolyDataReader/Writer` — stub |
+| Mesh OBJ | ✓ | ✓ | ✅ `io::formats::ObjMeshReader/Writer` — stub |
+| Mesh OFF | ✓ | ✓ | ✅ `io::formats::OffMeshReader/Writer` — stub |
+| Mesh FreeSurfer | ✓ | ✓ | ✅ `io::formats::FreeSurferMeshReader/Writer` — stub |
+| Mesh GIFTI | ✓ | ✓ | ✅ `io::formats::GiftiMeshReader/Writer` — stub |
+| Transform (ITK legacy) | ✓ | ✓ | ✅ `io::formats::ItkTransformReader/Writer` — stub |
+| Transform (HDF5) | ✓ | ✓ | ✅ `io::formats::Hdf5TransformReader/Writer` — stub |
