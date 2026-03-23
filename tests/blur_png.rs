@@ -2,11 +2,11 @@
 
 use std::env::temp_dir;
 
-use nitk::filters::gaussian::GaussianFilter;
-use nitk::filters::UnaryFilter;
-use nitk::image::{Image, Index, Region};
-use nitk::io::png::{read_gray8, write_gray8};
-use nitk::source::ImageSource;
+use itk_rs::filters::gaussian::GaussianFilter;
+use itk_rs::filters::UnaryFilter;
+use itk_rs::image::{Image, Index, Region};
+use itk_rs::io::png::{read_gray8, write_gray8};
+use itk_rs::source::ImageSource;
 
 /// Write a synthetic grayscale PNG (impulse at centre), blur it, save result,
 /// reload and verify that:

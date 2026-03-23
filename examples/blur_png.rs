@@ -5,9 +5,9 @@
 //!
 //! sigma defaults to 2.0 if not provided.
 
-use nitk::filters::gaussian::GaussianFilter;
-use nitk::io::png::{read_gray8, write_gray8};
-use nitk::source::ImageSource;
+use itk_rs::filters::gaussian::GaussianFilter;
+use itk_rs::io::png::{read_gray8, write_gray8};
+use itk_rs::source::ImageSource;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -30,7 +30,7 @@ fn main() {
 
     // The PNG reader gives u8 pixels; Gaussian needs f32.
     // Cast u8 → f32, blur, cast f32 → u8.
-    use nitk::filters::UnaryFilter;
+    use itk_rs::filters::UnaryFilter;
 
     let as_f32 = UnaryFilter::new(img, |p: u8| p as f32);
     let blurred = GaussianFilter::new(as_f32, sigma);

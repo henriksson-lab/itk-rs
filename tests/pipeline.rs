@@ -1,7 +1,7 @@
-use nitk::filters::gaussian::GaussianFilter;
-use nitk::filters::UnaryFilter;
-use nitk::source::{stream_full, ImageSource};
-use nitk::{Image, Index, Region, VecPixel};
+use itk_rs::filters::gaussian::GaussianFilter;
+use itk_rs::filters::UnaryFilter;
+use itk_rs::source::{stream_full, ImageSource};
+use itk_rs::{Image, Index, Region, VecPixel};
 
 fn solid_image<const D: usize>(size: [usize; D], fill: f32) -> Image<f32, D> {
     Image::allocate(
