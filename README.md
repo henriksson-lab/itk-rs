@@ -10,6 +10,16 @@ The code has been automatically translated from C++. Further testing is necessar
 
 ITK is the gold standard for medical image processing but is written in heavily templated C++. This project translates ITK's core patterns into idiomatic Rust, gaining memory safety, modern tooling, and no runtime without sacrificing the compile-time genericity that makes ITK fast.
 
+Compilation of this crate is significantly faster than SimpleITK-rs + it's C++
+dependency. This is likely because SimpleITK is designed for Python and is forced to
+compile all versions of all functions ahead of time, while this package
+should - based on generics - should only compile as much as needed for 
+downstream applications.
+
+Unlike SimpleITK-rs, this package is also feature complete, as callback functions
+across the C++/Rust layer are otherwise hard to support.
+
+
 ## Design
 
 ### C++ templates → Rust const generics + traits
