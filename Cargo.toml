@@ -2,9 +2,10 @@
 name = "nitk"
 version = "0.1.0"
 edition = "2021"
-license = "Apache 2.0"
+license = "Apache-2.0"
 homepage = "https://itk.org/"
 description = "A Rust translation of ITK (Insight Segmentation and Registration Toolkit), the C++ medical image processing library."
+exclude = ["ITK/**", "ITK"]
 
 [features]
 ## Enable PNG image I/O (requires the `png` crate).
