@@ -11,7 +11,7 @@
 use rayon::prelude::*;
 
 use crate::image::{Image, Index, Region, iter_region};
-use crate::pixel::{NumericPixel, VecPixel};
+use crate::pixel::VecPixel;
 use crate::source::ImageSource;
 
 // Displacement field type aliases (2D: VecPixel<f32, 2>, 3D: VecPixel<f32, 3>)
@@ -88,7 +88,7 @@ where
         let f2 = self.field2.generate_region(self.field2.largest_region());
         let bounds2 = f2.region;
         let sp = f2.spacing;
-        let or = f2.origin;
+        let _or = f2.origin;
 
         let mut out_indices = Vec::with_capacity(requested.linear_len());
         iter_region(&requested, |idx| out_indices.push(idx));

@@ -338,7 +338,7 @@ where S: crate::source::ImageSource<u32, 2>
         use std::collections::HashMap;
 
         let img = self.source.generate_region(self.source.largest_region());
-        let [w, h] = [img.region.size.0[0], img.region.size.0[1]];
+        let [_w, _h] = [img.region.size.0[0], img.region.size.0[1]];
 
         let mut areas: HashMap<u32, usize> = HashMap::new();
         let mut sums_x: HashMap<u32, f64> = HashMap::new();

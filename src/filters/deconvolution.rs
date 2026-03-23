@@ -218,7 +218,7 @@ where
         let (frk, fik) = fft2(&kbuf, &im_k, w, h);
         // Flipped kernel (for convolution in update step)
         let kbuf_flip: Vec<f64> = {
-            let mut k = kbuf.clone();
+            let k = kbuf.clone();
             // Flip by reversing DFT conjugate: H* has conjugate spectrum
             k
         };

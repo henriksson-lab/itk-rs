@@ -43,7 +43,7 @@ where
 
     fn generate_region(&self, _requested: Region<2>) -> Image<f32, 2> {
         let input = self.source.generate_region(self.source.largest_region());
-        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [_w, _h] = [input.region.size.0[0], input.region.size.0[1]];
 
         // Initialize with input values
         let mut corrected: Vec<f64> = input.data.iter().map(|&p| (p as f64).max(1e-6)).collect();

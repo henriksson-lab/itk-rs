@@ -684,7 +684,7 @@ impl<SA, SB> LabelOverlapMeasuresFilter<SA, SB>
         SB: crate::source::ImageSource<u32, D>,
     {
         use crate::image::iter_region;
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashSet;
 
         let a = self.source_a.generate_region(self.source_a.largest_region());
         let b = self.source_b.generate_region(self.source_b.largest_region());
@@ -759,11 +759,9 @@ impl STAPLEFilter {
             let mut new_w: Vec<f64> = vec![0.0; n_pix];
             for i in 0..n_pix {
                 let mut num = w[i];
-                let mut den = w[i];
                 for r in 0..n_raters {
                     let d = (self.sources[r].data[i] != 0) as usize;
                     num *= if d == 1 { p[r] } else { 1.0 - p[r] };
-                    den *= if d == 1 { p[r] } else { 1.0 - p[r] };
                 }
                 let mut neg = 1.0 - w[i];
                 for r in 0..n_raters {

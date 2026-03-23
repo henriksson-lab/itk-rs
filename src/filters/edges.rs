@@ -1467,7 +1467,7 @@ where
     fn origin(&self) -> [f64; 2] { self.source.origin() }
 
     fn generate_region(&self, requested: Region<2>) -> Image<f32, 2> {
-        use crate::filters::recursive_gaussian::RecursiveGaussianFilter;
+        
         let input_img = self.source.generate_region(self.source.largest_region());
 
         let n = self.num_sigma_steps.max(1);
@@ -1541,7 +1541,7 @@ where
     fn spacing(&self) -> [f64; 2] { self.source.spacing() }
     fn origin(&self) -> [f64; 2] { self.source.origin() }
 
-    fn generate_region(&self, requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
+    fn generate_region(&self, _requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
         let input = self.source.generate_region(self.source.largest_region());
         let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
         let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];

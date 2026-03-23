@@ -7,7 +7,7 @@
 //! | [`SyNRegistrationMethod`] | `SyNImageRegistrationMethod` |
 //! | [`ImageRegistrationMethodV4`] | `ImageRegistrationMethodv4` |
 
-use crate::image::{Image, Region, iter_region};
+use crate::image::Image;
 use crate::pixel::VecPixel;
 use crate::source::ImageSource;
 
@@ -250,8 +250,8 @@ where
 
         let fixed_img = self.fixed.generate_region(self.fixed.largest_region());
         let moving_img = self.moving.generate_region(self.moving.largest_region());
-        let [w, h] = [fixed_img.region.size.0[0], fixed_img.region.size.0[1]];
-        let [ox, oy] = [fixed_img.region.index.0[0], fixed_img.region.index.0[1]];
+        let [_w, _h] = [fixed_img.region.size.0[0], fixed_img.region.size.0[1]];
+        let [_ox, _oy] = [fixed_img.region.index.0[0], fixed_img.region.index.0[1]];
 
         let cost = |params: &[f64]| -> f64 {
             let tx = params[0].round() as i64;

@@ -95,7 +95,7 @@ where
         // Unsigned distance from foreground
         let dist_fg = unsigned_distance_map(&input, fg, requested);
         // Unsigned distance from background (= dist to nearest bg pixel)
-        let dist_bg = unsigned_distance_map(&input, fg, requested);
+        let _dist_bg = unsigned_distance_map(&input, fg, requested);
 
         // For signed: pixels inside fg → negative, pixels outside → positive
         let mut out_indices: Vec<Index<D>> = Vec::with_capacity(requested.linear_len());

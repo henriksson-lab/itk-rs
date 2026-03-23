@@ -396,8 +396,8 @@ where
     fn origin(&self) -> [f64; D] { self.source.origin() }
 
     fn generate_region(&self, requested: crate::image::Region<D>) -> crate::image::Image<crate::pixel::VecPixel<f32, N>, D> {
-        use crate::pixel::{NumericPixel, VecPixel};
-        use crate::image::{Image, Region, iter_region};
+        use crate::pixel::VecPixel;
+        use crate::image::{Image, iter_region};
 
         let full = self.source.generate_region(self.source.largest_region());
         let bounds = full.region;
@@ -488,7 +488,7 @@ where
     fn spacing(&self) -> [f64; 2] { self.source.spacing() }
     fn origin(&self) -> [f64; 2] { self.source.origin() }
 
-    fn generate_region(&self, requested: crate::image::Region<2>) -> crate::image::Image<crate::pixel::VecPixel<f32, N>, 2> {
+    fn generate_region(&self, _requested: crate::image::Region<2>) -> crate::image::Image<crate::pixel::VecPixel<f32, N>, 2> {
         use crate::pixel::VecPixel;
         let full = self.source.generate_region(self.source.largest_region());
         let region = full.region;

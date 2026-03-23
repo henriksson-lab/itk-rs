@@ -7,7 +7,7 @@
 //! | [`MattesMutualInformation`]  | `MattesMutualInformationImageToImageMetricv4` |
 //! | [`ANTSCorrelationMetric`]    | `ANTSNeighborhoodCorrelationImageToImageMetricv4` |
 
-use crate::image::{Image, Region, iter_region};
+use crate::image::iter_region;
 use crate::pixel::NumericPixel;
 use crate::source::ImageSource;
 

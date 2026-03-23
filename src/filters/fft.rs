@@ -88,7 +88,7 @@ where
     fn spacing(&self) -> [f64; 2] { self.source.spacing() }
     fn origin(&self) -> [f64; 2] { self.source.origin() }
 
-    fn generate_region(&self, requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
+    fn generate_region(&self, _requested: Region<2>) -> Image<VecPixel<f32, 2>, 2> {
         let input = self.source.generate_region(self.source.largest_region());
         let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
         let re: Vec<f64> = input.data.iter().map(|p| p.to_f64()).collect();

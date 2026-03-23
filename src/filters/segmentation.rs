@@ -587,7 +587,7 @@ where
         if n == 0 || self.k == 0 { return Image { region: requested, spacing: input.spacing, origin: input.origin, data: vec![0; n] }; }
 
         let vals: Vec<f64> = input.data.iter().map(|p| p.to_f64()).collect();
-        let mut vmin = vals.iter().cloned().fold(f64::MAX, f64::min);
+        let vmin = vals.iter().cloned().fold(f64::MAX, f64::min);
         let mut vmax = vals.iter().cloned().fold(f64::MIN, f64::max);
         if (vmax - vmin).abs() < 1e-12 { vmax = vmin + 1.0; }
 
@@ -1764,7 +1764,7 @@ where
     fn spacing(&self) -> [f64; 2] { self.source.spacing() }
     fn origin(&self) -> [f64; 2] { self.source.origin() }
 
-    fn generate_region(&self, requested: Region<2>) -> Image<u32, 2> {
+    fn generate_region(&self, _requested: Region<2>) -> Image<u32, 2> {
         // Use MorphologicalWatershedFilter and find the label containing each seed
         let input = self.source.generate_region(self.source.largest_region());
         let ws_filter = MorphologicalWatershedFilter::<_, f32>::new(input, self.level);
@@ -1829,7 +1829,7 @@ where
                 ));
             }
         }
-        let n = seeds.len();
+        let _n = seeds.len();
 
         // Assign pixels to nearest seed (Voronoi)
         let mut data = vec![0u32; w * h];

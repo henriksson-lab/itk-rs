@@ -897,7 +897,7 @@ impl<P: NumericPixel, const D: usize> ImageSource<P, D> for NaryMaximumFilter<P,
         let images: Vec<_> = self.sources.iter()
             .map(|s| s.generate_region(requested))
             .collect();
-        let len = images[0].data.len();
+        let _len = images[0].data.len();
         let mut data = images[0].data.clone();
         for img in &images[1..] {
             for (i, &p) in img.data.iter().enumerate() {
@@ -1198,7 +1198,7 @@ where
         // Build intensity-to-intensity LUT: for each source intensity, find the reference
         // intensity that has the same CDF value
         let lut: Vec<f64> = (0..nb).map(|i| {
-            let src_intensity = src_min + (i as f64 + 0.5) / nb as f64 * (src_max - src_min);
+            let _src_intensity = src_min + (i as f64 + 0.5) / nb as f64 * (src_max - src_min);
             let cdf_val = src_cdf[i];
             // Find bin in reference CDF with matching value
             let ref_bin = ref_cdf.partition_point(|&c| c < cdf_val).min(nb - 1);

@@ -1251,7 +1251,7 @@ where
 
     fn generate_region(&self, requested: Region<2>) -> Image<P, 2> {
         let input = self.source.generate_region(requested);
-        let [w, h] = [input.region.size.0[0], input.region.size.0[1]];
+        let [_w, _h] = [input.region.size.0[0], input.region.size.0[1]];
         let [ox, oy] = [input.region.index.0[0], input.region.index.0[1]];
         let mut out = input.clone();
 
