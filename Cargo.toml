@@ -6,10 +6,23 @@ license = "Apache 2.0"
 homepage = "https://itk.org/"
 description = "A Rust translation of ITK (Insight Segmentation and Registration Toolkit), the C++ medical image processing library."
 
+[features]
+## Enable PNG image I/O (requires the `png` crate).
+io-png = ["dep:png"]
+## Enable stub API for all other image/mesh/transform formats
+## (NIfTI, NRRD, DICOM, TIFF, HDF5, VTK, …).  No additional
+## dependencies are needed — these are skeletal readers/writers
+## whose backends are filled in separately.
+io = []
+
 [dependencies]
 rayon = "1.10"
-png = "0.17"
+png = { version = "0.17", optional = true }
 rand = "0.8"
 
 [dev-dependencies]
 approx = "0.5"
+
+[[example]]
+name = "blur_png"
+required-features = ["io-png"]

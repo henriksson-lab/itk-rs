@@ -1,3 +1,5 @@
+#![cfg(feature = "io-png")]
+
 use std::env::temp_dir;
 
 use nitk::filters::gaussian::GaussianFilter;
