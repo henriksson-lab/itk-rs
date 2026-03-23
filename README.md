@@ -1,4 +1,4 @@
-# nitk — Native ITK in Rust
+# itk-rs — Native ITK in Rust
 
 A Rust translation of [ITK](https://itk.org/) (Insight Segmentation and Registration Toolkit), the C++ medical image processing library.
 
@@ -37,7 +37,7 @@ ITK's two core template parameters map directly to Rust:
 
 ### The pipeline model
 
-ITK uses a three-phase lazy pipeline for out-of-core (streaming) processing. `nitk` replicates this with a single trait:
+ITK uses a three-phase lazy pipeline for out-of-core (streaming) processing. `itk-rs` replicates this with a single trait:
 
 ```rust
 pub trait ImageSource<P, const D: usize> {
@@ -96,6 +96,8 @@ Arithmetic filters (Gaussian, Mean) require the `NumericPixel` trait bound, whic
 |---|---|---|
 | `GaussianFilter` | `DiscreteGaussianImageFilter` | Separable Gaussian smoothing |
 | `UnaryFilter<F>` | `UnaryFunctorImageFilter` | Per-pixel transform via closure |
+
+For the full list of implemented filters, see [FEATURES.md](FEATURES.md).
 
 ## Status
 
