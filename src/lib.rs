@@ -5,6 +5,7 @@ pub mod region_splitter;
 pub mod filters;
 pub mod interpolate;
 pub mod io;
+pub mod transform;
 
 pub use image::{Image, Index, Size, Region};
 pub use pixel::{Pixel, NumericPixel, VecPixel};

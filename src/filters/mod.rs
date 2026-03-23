@@ -1,4 +1,11 @@
+mod conv;
 pub mod gaussian;
+pub mod mean;
+pub mod median;
+pub mod binomial_blur;
+pub mod recursive_gaussian;
+pub mod bilateral;
+pub mod anisotropic_diffusion;
 
 use std::marker::PhantomData;
 

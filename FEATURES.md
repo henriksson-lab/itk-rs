@@ -27,21 +27,21 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Filter | ITK class | Status |
 |---|---|---|
 | Gaussian (separable) | `DiscreteGaussianImageFilter` | ✅ `src/filters/gaussian.rs` |
-| Recursive Gaussian | `RecursiveGaussianImageFilter` | ⬜ |
-| Smoothing Recursive Gaussian | `SmoothingRecursiveGaussianImageFilter` | ⬜ |
-| Mean | `MeanImageFilter` | ⬜ |
-| Median | `MedianImageFilter` | ⬜ |
-| Box Mean | `BoxMeanImageFilter` | ⬜ |
+| Recursive Gaussian | `RecursiveGaussianImageFilter` | ✅ `src/filters/recursive_gaussian.rs` |
+| Smoothing Recursive Gaussian | `SmoothingRecursiveGaussianImageFilter` | ✅ `src/filters/recursive_gaussian.rs` |
+| Mean | `MeanImageFilter` | ✅ `src/filters/mean.rs` |
+| Median | `MedianImageFilter` | ✅ `src/filters/median.rs` |
+| Box Mean | `BoxMeanImageFilter` | ✅ `src/filters/mean.rs` |
 | Box Sigma | `BoxSigmaImageFilter` | ⬜ |
-| Binomial Blur | `BinomialBlurImageFilter` | ⬜ |
+| Binomial Blur | `BinomialBlurImageFilter` | ✅ `src/filters/binomial_blur.rs` |
 | FFT Discrete Gaussian | `FFTDiscreteGaussianImageFilter` | ⬜ |
 
 ### Anisotropic Smoothing
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Gradient Anisotropic Diffusion | `GradientAnisotropicDiffusionImageFilter` | ⬜ |
-| Curvature Anisotropic Diffusion | `CurvatureAnisotropicDiffusionImageFilter` | ⬜ |
+| Gradient Anisotropic Diffusion | `GradientAnisotropicDiffusionImageFilter` | ✅ `src/filters/anisotropic_diffusion.rs` |
+| Curvature Anisotropic Diffusion | `CurvatureAnisotropicDiffusionImageFilter` | ✅ `src/filters/anisotropic_diffusion.rs` (D=2) |
 | Vector Gradient Anisotropic Diffusion | `VectorGradientAnisotropicDiffusionImageFilter` | ⬜ |
 | Vector Curvature Anisotropic Diffusion | `VectorCurvatureAnisotropicDiffusionImageFilter` | ⬜ |
 
@@ -145,7 +145,7 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 | Hessian to Objectness Measure | `HessianToObjectnessMeasureImageFilter` | ⬜ |
 | Multi-Scale Hessian Measure | `MultiScaleHessianBasedMeasureImageFilter` | ⬜ |
 | Hessian 3D to Vesselness | `Hessian3DToVesselnessMeasureImageFilter` | ⬜ |
-| Bilateral | `BilateralImageFilter` | ⬜ |
+| Bilateral | `BilateralImageFilter` | ✅ `src/filters/bilateral.rs` |
 | Unsharp Mask | `UnsharpMaskImageFilter` | ⬜ |
 | Gradient Vector Flow | `GradientVectorFlowImageFilter` | ⬜ |
 | Hough Transform 2D Circles | `HoughTransform2DCirclesImageFilter` | ⬜ |
@@ -456,18 +456,18 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Transform | ITK class | Status |
 |---|---|---|
-| Translation | `TranslationTransform` | ⬜ |
-| Rigid 2D | `Rigid2DTransform` | ⬜ |
-| Euler 2D | `Euler2DTransform` | ⬜ |
-| Rigid 3D | (Versor-based) | ⬜ |
-| Euler 3D | `Euler3DTransform` | ⬜ |
-| Similarity 2D | `Similarity2DTransform` | ⬜ |
+| Translation | `TranslationTransform` | ✅ |
+| Rigid 2D | `Rigid2DTransform` | ✅ (via Euler2D) |
+| Euler 2D | `Euler2DTransform` | ✅ |
+| Rigid 3D | (Versor-based) | ✅ (via VersorRigid3D) |
+| Euler 3D | `Euler3DTransform` | ✅ |
+| Similarity 2D | `Similarity2DTransform` | ✅ |
 | Similarity 3D | `Similarity3DTransform` | ⬜ |
-| Affine | `AffineTransform` | ⬜ |
-| Scale | `ScaleTransform` | ⬜ |
-| BSpline Deformable | `BSplineTransform` | ⬜ |
-| Displacement Field | `DisplacementFieldTransform` | ⬜ |
-| Composite Transform | `CompositeTransform` | ⬜ |
+| Affine | `AffineTransform` | ✅ |
+| Scale | `ScaleTransform` | ✅ |
+| BSpline Deformable | `BSplineTransform` | ✅ |
+| Displacement Field | `DisplacementFieldTransform` | ✅ |
+| Composite Transform | `CompositeTransform` | ✅ |
 | Thin Plate Spline | (Kernel transform) | ⬜ |
 | Gaussian Exponential Diffeomorphic | `GaussianExponentialDiffeomorphicTransform` | ⬜ |
 | Time Varying Velocity Field | `TimeVaryingVelocityFieldTransform` | ⬜ |
