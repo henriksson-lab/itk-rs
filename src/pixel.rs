@@ -10,16 +10,24 @@ impl<T: Copy + Default + Send + Sync + 'static> Pixel for T {}
 pub trait NumericPixel: Pixel + Add<Output = Self> {
     fn zero() -> Self;
     fn scale(self, w: f64) -> Self;
+    /// Construct from a scalar f64 (used by interpolators that work in f64 internally).
+    fn from_f64(v: f64) -> Self;
+    /// Convert to f64 (lossy for vector pixels — returns the first component's value).
+    fn to_f64(self) -> f64;
 }
 
 impl NumericPixel for f32 {
     fn zero() -> Self { 0.0 }
     fn scale(self, w: f64) -> Self { self * w as f32 }
+    fn from_f64(v: f64) -> Self { v as f32 }
+    fn to_f64(self) -> f64 { self as f64 }
 }
 
 impl NumericPixel for f64 {
     fn zero() -> Self { 0.0 }
     fn scale(self, w: f64) -> Self { self * w }
+    fn from_f64(v: f64) -> Self { v }
+    fn to_f64(self) -> f64 { self }
 }
 
 /// Fixed-length vector pixel. Analog to itk::Vector<T, N>.
@@ -53,5 +61,11 @@ impl<T: NumericPixel, const N: usize> NumericPixel for VecPixel<T, N> {
             out.0[i] = self.0[i].scale(w);
         }
         out
+    }
+    fn from_f64(v: f64) -> Self {
+        Self([T::from_f64(v); N])
+    }
+    fn to_f64(self) -> f64 {
+        self.0[0].to_f64()
     }
 }

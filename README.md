@@ -2,6 +2,10 @@
 
 A Rust translation of [ITK](https://itk.org/) (Insight Segmentation and Registration Toolkit), the C++ medical image processing library.
 
+This is not the authorative implementation. New features should be directed to the original ITK C++ implementation.
+
+The code has been automatically translated from C++. Further testing is necessary
+
 ## Why
 
 ITK is the gold standard for medical image processing but is written in heavily templated C++. This project translates ITK's core patterns into idiomatic Rust, gaining memory safety, modern tooling, and no runtime without sacrificing the compile-time genericity that makes ITK fast.

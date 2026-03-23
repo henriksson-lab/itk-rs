@@ -478,12 +478,12 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Interpolator | ITK class | Status |
 |---|---|---|
-| Nearest Neighbor | `NearestNeighborInterpolateImageFunction` | ⬜ |
-| Linear | `LinearInterpolateImageFunction` | ⬜ |
-| BSpline | `BSplineInterpolateImageFunction` | ⬜ |
-| Gaussian | `GaussianInterpolateImageFunction` | ⬜ |
-| Label Gaussian | `LabelImageGaussianInterpolateImageFunction` | ⬜ |
-| Windowed Sinc | `WindowedSincInterpolateImageFunction` | ⬜ |
+| Nearest Neighbor | `NearestNeighborInterpolateImageFunction` | ✅ `src/interpolate/nearest.rs` |
+| Linear | `LinearInterpolateImageFunction` | ✅ `src/interpolate/linear.rs` — N-D, 2^D corners |
+| BSpline | `BSplineInterpolateImageFunction` | ✅ `src/interpolate/bspline.rs` — orders 0–5, IIR prefilter |
+| Gaussian | `GaussianInterpolateImageFunction` | ✅ `src/interpolate/gaussian.rs` — erf-weighted |
+| Label Gaussian | `LabelImageGaussianInterpolateImageFunction` | ✅ `src/interpolate/gaussian.rs` |
+| Windowed Sinc | `WindowedSincInterpolateImageFunction` | ✅ `src/interpolate/windowed_sinc.rs` — Hamming/Cosine/Welch/Lanczos/Blackman |
 
 ---
 
