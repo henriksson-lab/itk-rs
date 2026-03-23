@@ -6,6 +6,8 @@ pub mod binomial_blur;
 pub mod recursive_gaussian;
 pub mod bilateral;
 pub mod anisotropic_diffusion;
+pub mod intensity;
+pub mod threshold;
 
 use std::marker::PhantomData;
 

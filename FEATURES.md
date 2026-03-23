@@ -55,47 +55,47 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Add | `AddImageFilter` | ⬜ |
-| Subtract | `SubtractImageFilter` | ⬜ |
-| Multiply | `MultiplyImageFilter` | ⬜ |
-| Divide | `DivideImageFilter` | ⬜ |
-| Abs | `AbsImageFilter` | ⬜ |
-| Square | `SquareImageFilter` | ⬜ |
-| Sqrt | `SqrtImageFilter` | ⬜ |
-| Exp | `ExpImageFilter` | ⬜ |
-| Log | `LogImageFilter` | ⬜ |
-| Log10 | `Log10ImageFilter` | ⬜ |
-| Sin | `SinImageFilter` | ⬜ |
-| Cos | `CosImageFilter` | ⬜ |
-| Atan | `AtanImageFilter` | ⬜ |
+| Add | `AddImageFilter` | ✅ `intensity::add_images` |
+| Subtract | `SubtractImageFilter` | ✅ `intensity::subtract_images` |
+| Multiply | `MultiplyImageFilter` | ✅ `intensity::multiply_images` |
+| Divide | `DivideImageFilter` | ✅ `intensity::divide_images` |
+| Abs | `AbsImageFilter` | ✅ `intensity::abs_filter` |
+| Square | `SquareImageFilter` | ✅ `intensity::square_filter` |
+| Sqrt | `SqrtImageFilter` | ✅ `intensity::sqrt_filter` |
+| Exp | `ExpImageFilter` | ✅ `intensity::exp_filter` |
+| Log | `LogImageFilter` | ✅ `intensity::log_filter` |
+| Log10 | `Log10ImageFilter` | ✅ `intensity::log10_filter` |
+| Sin | `SinImageFilter` | ✅ `intensity::sin_filter` |
+| Cos | `CosImageFilter` | ✅ `intensity::cos_filter` |
+| Atan | `AtanImageFilter` | ✅ `intensity::atan_filter` |
 | Atan2 | `Atan2ImageFilter` | ⬜ |
-| Pow | `PowImageFilter` | ⬜ |
-| Sigmoid | `SigmoidImageFilter` | ⬜ |
-| Invert Intensity | `InvertIntensityImageFilter` | ⬜ |
-| Rescale Intensity | `RescaleIntensityImageFilter` | ⬜ |
-| Shift Scale | `ShiftScaleImageFilter` | ⬜ |
-| Clamp | `ClampImageFilter` | ⬜ |
-| Normalize | `NormalizeImageFilter` | ⬜ |
+| Pow | `PowImageFilter` | ✅ `intensity::PowFilter` |
+| Sigmoid | `SigmoidImageFilter` | ✅ `intensity::SigmoidFilter` |
+| Invert Intensity | `InvertIntensityImageFilter` | ✅ `intensity::InvertIntensityFilter` |
+| Rescale Intensity | `RescaleIntensityImageFilter` | ✅ `intensity::RescaleIntensityFilter` |
+| Shift Scale | `ShiftScaleImageFilter` | ✅ `intensity::ShiftScaleFilter` |
+| Clamp | `ClampImageFilter` | ✅ `intensity::ClampFilter` |
+| Normalize | `NormalizeImageFilter` | ✅ `intensity::NormalizeFilter` |
 | Normalize to Constant | `NormalizeToConstantImageFilter` | ⬜ |
-| Intensity Windowing | `IntensityWindowingImageFilter` | ⬜ |
+| Intensity Windowing | `IntensityWindowingImageFilter` | ✅ `intensity::IntensityWindowingFilter` |
 | Histogram Matching | `HistogramMatchingImageFilter` | ⬜ |
-| Mask | `MaskImageFilter` | ⬜ |
-| Mask Negated | `MaskNegatedImageFilter` | ⬜ |
-| Maximum (pixelwise) | `MaximumImageFilter` | ⬜ |
-| Minimum (pixelwise) | `MinimumImageFilter` | ⬜ |
+| Mask | `MaskImageFilter` | ✅ `intensity::MaskFilter` |
+| Mask Negated | `MaskNegatedImageFilter` | ✅ `intensity::MaskNegatedFilter` |
+| Maximum (pixelwise) | `MaximumImageFilter` | ✅ `intensity::maximum_images` |
+| Minimum (pixelwise) | `MinimumImageFilter` | ✅ `intensity::minimum_images` |
 | And | `AndImageFilter` | ⬜ |
 | Or | `OrImageFilter` | ⬜ |
 | Xor | `XorImageFilter` | ⬜ |
 | Not | `NotImageFilter` | ⬜ |
-| Weighted Add | `WeightedAddImageFilter` | ⬜ |
+| Weighted Add | `WeightedAddImageFilter` | ✅ `intensity::WeightedAddFilter` |
 | N-ary Add | `NaryAddImageFilter` | ⬜ |
 | N-ary Maximum | `NaryMaximumImageFilter` | ⬜ |
 | Constrained Value Addition | `ConstrainedValueAdditionImageFilter` | ⬜ |
 | Constrained Value Difference | `ConstrainedValueDifferenceImageFilter` | ⬜ |
-| Bounded Reciprocal | `BoundedReciprocalImageFilter` | ⬜ |
-| Modulus | `ModulusImageFilter` | ⬜ |
-| Round | `RoundImageFilter` | ⬜ |
-| Cast | `CastImageFilter` | ⬜ |
+| Bounded Reciprocal | `BoundedReciprocalImageFilter` | ✅ `intensity::bounded_reciprocal_filter` |
+| Modulus | `ModulusImageFilter` | ✅ `intensity::ModulusFilter` |
+| Round | `RoundImageFilter` | ✅ `intensity::round_filter` |
+| Cast | `CastImageFilter` | ✅ (via `UnaryFilter` with `from_f64`/`to_f64`) |
 | Complex to Real | `ComplexToRealImageFilter` | ⬜ |
 | Complex to Imaginary | `ComplexToImaginaryImageFilter` | ⬜ |
 | Complex to Modulus | `ComplexToModulusImageFilter` | ⬜ |
@@ -111,9 +111,9 @@ Legend: ✅ Done | 🚧 In progress | ⬜ Not started
 
 | Filter | ITK class | Status |
 |---|---|---|
-| Binary Threshold | `BinaryThresholdImageFilter` | ⬜ |
-| Threshold (in-place) | `ThresholdImageFilter` | ⬜ |
-| Otsu Threshold | `OtsuThresholdImageFilter` | ⬜ |
+| Binary Threshold | `BinaryThresholdImageFilter` | ✅ `threshold::BinaryThresholdFilter` |
+| Threshold (in-place) | `ThresholdImageFilter` | ✅ `threshold::ThresholdFilter` |
+| Otsu Threshold | `OtsuThresholdImageFilter` | ✅ `threshold::OtsuThresholdFilter` |
 | Otsu Multiple Thresholds | `OtsuMultipleThresholdsImageFilter` | ⬜ |
 | Huang Threshold | `HuangThresholdImageFilter` | ⬜ |
 | Li Threshold | `LiThresholdImageFilter` | ⬜ |
