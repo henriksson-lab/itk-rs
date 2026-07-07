@@ -4,7 +4,8 @@ A Rust translation of [ITK](https://itk.org/) (Insight Segmentation and Registra
 
 This is not the authorative implementation. New features should be directed to the original ITK C++ implementation.
 
-The code has been automatically translated from C++. Further testing is necessary
+* 2026-07-06: **New audit started. Don't trust this code yet**
+
 
 ## Why
 
